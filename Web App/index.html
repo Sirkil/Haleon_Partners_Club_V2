@@ -1,0 +1,2241 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Haleon Partners Club</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    /* Scroll Indicator Styles */
+    .scroll-indicator {
+      position: absolute;
+      top: -46px;
+      /* Places it directly above the navbar */
+      left: 0;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #a1b0c0;
+      /* Matches muted theme text */
+      font-size: 0.75rem;
+      font-weight: 500;
+      pointer-events: none;
+      /* Let clicks pass through to content behind it */
+      z-index: 20;
+      animation: floatDown 2s infinite ease-in-out;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+      transition: opacity 0.3s ease;
+    }
+
+    .scroll-indicator svg {
+      width: 20px;
+      height: 20px;
+      margin-top: -2px;
+      color: var(--green);
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+    }
+
+    @keyframes floatDown {
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(6px);
+      }
+    }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth, createUserWithEmailAndPassword,
+      signInWithEmailAndPassword, signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      getFirestore, doc, setDoc, getDoc,
+      updateDoc, serverTimestamp, onSnapshot,
+      collection, query, where, getDocs, orderBy
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAmVVQEPpfs_K3AfqfjkAaQUF8foj-WxsU",
+      authDomain: "haleon-partners-club.firebaseapp.com",
+      projectId: "haleon-partners-club",
+      storageBucket: "haleon-partners-club.firebasestorage.app",
+      messagingSenderId: "1037867331058",
+      appId: "1:1037867331058:web:0777855bac1c681ad88f6b"
+    };
+
+    const fbApp = initializeApp(firebaseConfig);
+    const auth = getAuth(fbApp);
+    const db = getFirestore(fbApp);
+
+    window._fb = {
+      auth, db,
+      doc, setDoc, getDoc, updateDoc, serverTimestamp, onSnapshot,
+      collection, query, where, getDocs, orderBy,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut
+    };
+
+    // Helper: safely decode URL param (handles '+' as space, which some browsers don't)
+    function safeDecodeParam(val) {
+      if (!val) return '';
+      try {
+        // First replace '+' with spaces (URLSearchParams already does this, but be safe)
+        return decodeURIComponent(val.replace(/\+/g, ' '));
+      } catch (e) {
+        return val.replace(/\+/g, ' ');
+      }
+    }
+
+    // Helper: wait for a DOM element to exist (retries up to ~3 seconds)
+    function waitForElement(id, maxAttempts = 30) {
+      return new Promise((resolve) => {
+        let attempts = 0;
+        function check() {
+          const el = document.getElementById(id);
+          if (el) return resolve(el);
+          attempts++;
+          if (attempts >= maxAttempts) return resolve(null);
+          setTimeout(check, 100);
+        }
+        check();
+      });
+    }
+
+    // Helper: fill a field robustly (sets value + dispatches events for browser autofill recognition)
+    function fillField(el, value) {
+      if (!el || !value) return;
+      el.value = value;
+      el.setAttribute('value', value);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Core autofill function (can be called from multiple entry points)
+    async function tryAutoFillFromURL() {
+      const _p = new URLSearchParams(window.location.search);
+      const emailParam = _p.get('email');
+      const passParam = _p.get('pass');
+      if (!emailParam && !passParam) return;
+
+      const emailEl = await waitForElement('login-email');
+      const passEl = await waitForElement('login-pass');
+
+      if (emailParam) fillField(emailEl, safeDecodeParam(emailParam));
+      if (passParam) fillField(passEl, safeDecodeParam(passParam));
+
+      // Clean URL to avoid leaking credentials in browser history
+      if (window.history && window.history.replaceState) {
+        const cleanUrl = window.location.pathname + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
+    }
+
+    onAuthStateChanged(auth, async user => {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) overlay.style.display = 'none';
+
+      if (user) {
+        try {
+          const snap = await getDoc(doc(db, 'users', user.uid));
+          if (snap.exists()) {
+            window.bootApp(user.uid, snap.data(), false);
+          } else {
+            window.showView('view-login');
+          }
+        } catch (err) {
+          console.error('Firestore error on session restore:', err);
+          window.showView('view-login');
+        }
+      } else {
+        window.showView('view-login');
+        // Pre-fill login fields from URL params (deep link)
+        tryAutoFillFromURL();
+      }
+    });
+
+    // Fallback: also try autofill on DOMContentLoaded (covers slow Firebase init on some devices)
+    document.addEventListener('DOMContentLoaded', () => {
+      const _p = new URLSearchParams(window.location.search);
+      if (_p.get('email') || _p.get('pass')) {
+        // Delay slightly to let views render
+        setTimeout(() => tryAutoFillFromURL(), 300);
+      }
+    });
+  </script>
+</head>
+
+<body>
+  <div class="app" id="app">
+
+    <div class="global-header">
+      <img src="assets/Header.png" alt="Haleon Header">
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <canvas id="confetti-canvas"
+      style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;display:none;"></canvas>
+
+    <!--
+  <div class="dialog-overlay" id="register-reminder-dialog">
+    <div class="dialog-box">
+      <div class="dialog-icon">
+        <img src="assets/Haleon Logo (register).png" alt="Register" style="width: 180px; object-fit: contain;">
+      </div>
+      <div class="dialog-title">Register now for "Haleon Partners Club : Beyond the Counter" webinar</div>
+      <div class="dialog-sub" style="text-align: left; margin-bottom: 20px;">
+        1. Click the link below.<br>
+        2. Register on the Haleon Health Partner website.<br>
+        3. Receive your account confirmation<br>
+        4. Sign up for the webinar 
+      </div>
+      <button class="btn-primary" onclick="window.open('https://www.haleonhealthpartner.com/en-eg/news-events/events-and-webinars/haleon-partners-club-beyond-the-counter/', '_blank')">Register Here</button>
+      <button class="btn-secondary" style="margin-top:12px" onclick="document.getElementById('register-reminder-dialog').classList.remove('open')">Close</button>
+    </div>
+  </div>
+  -->
+
+    <div class="loading-overlay" id="loading-overlay">
+      <img src="assets/logo1.png" alt="Haleon Logo" class="app-logo" style="max-width: 180px;">
+      <div class="loading-spinner"></div>
+    </div>
+
+    <div class="view auth-view" id="view-login">
+      <div class="auth-logo">
+        <img src="assets/logo1.png" alt="Haleon Logo" class="app-logo" style="max-width: 200px;">
+      </div>
+      <div class="auth-title">Welcome back.</div>
+      <div class="field"><input type="email" id="login-email" placeholder="Email address" /></div>
+      <div class="field"><input type="password" id="login-pass" placeholder="Password" /></div>
+
+      <div style="text-align: right; margin-bottom: 12px;">
+        <a onclick="showView('view-forgot')" style="font-size: 0.85rem; color: var(--green); cursor: pointer;">Forgot
+          Password?</a>
+      </div>
+
+      <div class="auth-error" id="login-error"></div>
+      <button class="btn-primary" id="btn-login" onclick="doLogin()">LOGIN</button>
+      <div class="auth-switch">No account? <a href="https://form.jotform.com/260843536266058"
+          target="_blank">Register</a></div>
+    </div>
+
+    <div class="view auth-view" id="view-forgot">
+      <div class="auth-logo">
+        <img src="assets/logo1.png" alt="Haleon Logo" class="app-logo" style="max-width: 180px;">
+        <div class="sub">Password Recovery</div>
+      </div>
+      <div class="auth-title">Find Your PIN.</div>
+      <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; text-align: center;">Enter your registered
+        email address to retrieve your PIN code.</p>
+      <div class="field"><input type="email" id="forgot-email" placeholder="Email address" /></div>
+      <div class="auth-error" id="forgot-error"></div>
+      <button class="btn-primary" id="btn-forgot" onclick="doFindPin()">CHECK</button>
+      <div class="auth-switch"><a onclick="showView('view-login')">← Back to Login</a></div>
+    </div>
+
+    <!-- PIN Reveal Dialog -->
+    <div class="dialog-overlay" id="pin-reveal-dialog">
+      <div class="dialog-box">
+        <div class="dialog-icon" style="font-size:2.5rem;">🔑</div>
+        <div class="dialog-title">Your PIN Code</div>
+        <div
+          style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:20px 30px;margin:16px 0;">
+          <div id="pin-reveal-value"
+            style="font-size:2.2rem;font-weight:800;letter-spacing:0.3em;color:var(--green);text-align:center;">—</div>
+        </div>
+        <div class="dialog-sub" style="margin-bottom:16px;">Use this PIN as your password when logging in.</div>
+        <button class="btn-primary" onclick="closePinRevealDialog()">Got It!</button>
+      </div>
+    </div>
+
+    <div class="view home-view" id="view-home">
+      <div class="top-navbar">
+        <div class="top-nav-greeting">Hi, <span id="nav-username">User</span> 👋</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <!-- TIER PROGRESS CARD WIDGET -->
+      <div class="tier-card-widget" id="tier-card-home" style="margin: 16px 16px 0 16px;">
+        <div class="tier-card-header">
+          <div class="tier-card-name"><span id="tc-name-home">No Tier</span></div>
+          <div class="tier-card-pts"><span id="tc-pts-home">0</span> pts</div>
+        </div>
+        <div class="tier-card-bar-bg">
+          <div class="tier-card-bar-fill" id="tc-fill-home" style="width: 0%;"></div>
+        </div>
+        <div class="tier-card-footer">
+          <span id="tc-next-home">500 pts to Bronze tier</span>
+        </div>
+      </div>
+      <!-- COMMENTED OUT HOME HEADER (POINTS, TIER BADGE, PROGRESS RING) PER USER REQUEST -->
+      <!--
+    <div class="home-header">
+      <div class="points-big" id="pts-display">0 Points</div>
+      <div class="tier-badge" id="tier-badge-home">Student Tier</div>
+      <div class="progress-wrap">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle class="progress-track" cx="70" cy="70" r="60"/>
+          <circle class="progress-fill" id="progress-ring" cx="70" cy="70" r="60"
+            stroke-dasharray="376.99" stroke-dashoffset="376.99"/>
+        </svg>
+        <div class="progress-center">
+          <div class="progress-pct" id="progress-pct">0%</div>
+          <div class="progress-label">Games Completed</div>
+        </div>
+      </div>
+    </div>
+    -->
+
+      <!-- ONBOARDING CARD WIDGET -->
+      <div class="onboarding-widget" id="onboarding-widget" style="padding: 0 16px;">
+
+        <!-- Compact Card View (Default) -->
+        <div class="onboarding-compact" id="onboarding-compact" onclick="toggleOnboardingCard(true)">
+          <div class="onboarding-compact-header">
+            <div>
+              <div class="onboarding-compact-title">Welcome to the club, <span class="onboarding-user-name">User</span>
+              </div>
+              <div class="onboarding-compact-sub" id="onboarding-compact-next">Next step: Link your physical card</div>
+            </div>
+            <div class="onboarding-expand-badge">
+              <span id="onboarding-compact-count">2 of 4</span>
+              <span class="onboarding-chevron">▼</span>
+            </div>
+          </div>
+          <div class="onboarding-progress-bar-bg" style="margin-top: 12px;">
+            <div class="onboarding-progress-bar-fill" id="onboarding-compact-fill" style="width: 50%;"></div>
+          </div>
+        </div>
+
+        <!-- Expanded Card View -->
+        <div class="onboarding-expanded" id="onboarding-expanded" style="display: none;">
+          <div class="onboarding-exp-header">
+            <div class="onboarding-exp-title">Welcome to the club, <span class="onboarding-user-name">User</span></div>
+            <div class="onboarding-exp-sub">Finish setup to unlock your first badge.</div>
+          </div>
+
+          <!-- Inner Setup Progress Box -->
+          <div class="onboarding-progress-box">
+            <div class="onboarding-progress-head">
+              <span>Setup progress</span>
+              <span id="onboarding-exp-count" style="font-weight: 800; color: #ffffff;">2 of 4</span>
+            </div>
+            <div class="onboarding-progress-bar-bg">
+              <div class="onboarding-progress-bar-fill" id="onboarding-exp-fill" style="width: 50%;"></div>
+            </div>
+          </div>
+
+          <!-- Onboarding Step Items List -->
+          <div class="onboarding-items-list">
+
+            <!-- Item 1: Verify Email (Done by default) -->
+            <div class="onboarding-item completed">
+              <div class="onboarding-item-left">
+                <div class="onboarding-check-icon">✓</div>
+                <span class="onboarding-item-name">Verify your email</span>
+              </div>
+              <span class="onboarding-item-pts">+5 pts</span>
+            </div>
+
+            <!-- Item 2: Complete Profile (Done by default) -->
+            <div class="onboarding-item completed">
+              <div class="onboarding-item-left">
+                <div class="onboarding-check-icon">✓</div>
+                <span class="onboarding-item-name">Complete your profile</span>
+              </div>
+              <span class="onboarding-item-pts">+10 pts</span>
+            </div>
+
+            <!-- Item 3: Link Physical Card -->
+            <div class="onboarding-item" id="onboarding-item-card" onclick="openCardLinkFromOnboarding(event)">
+              <div class="onboarding-item-left">
+                <div class="onboarding-check-icon" id="onboarding-card-icon">💳</div>
+                <span class="onboarding-item-name">Link your physical card</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="onboarding-item-pts">+10 pts</span>
+                <button class="onboarding-action-btn" id="onboarding-card-btn" style="display:none;">Link Card</button>
+              </div>
+            </div>
+
+            <!-- Item 4: Take First Quiz -->
+            <div class="onboarding-item" id="onboarding-item-quiz" onclick="openQuizFromOnboarding(event)">
+              <div class="onboarding-item-left">
+                <div class="onboarding-check-icon" id="onboarding-quiz-icon">▶</div>
+                <span class="onboarding-item-name">Take your first quiz</span>
+              </div>
+              <span class="onboarding-item-pts">+15 pts</span>
+            </div>
+
+          </div>
+
+          <!-- Finish Setup Button -->
+          <button class="btn-onboarding-finish" onclick="toggleOnboardingCard(false)">Finish setup</button>
+
+        </div>
+      </div>
+
+      <!-- 1. HERO SLIDER SECTION -->
+      <div class="section" style="padding-top: 16px;">
+        <div class="section-title">Featured Highlights</div>
+        <div class="carousel-wrap" id="top-banners-wrap" style="margin-bottom: 20px;">
+          <div class="carousel-track" id="banner-carousel-track">
+
+            <!-- Banner 1: Panadol -->
+            <div class="carousel-slide" id="slide-banner-panadol" style="height: auto;">
+              <!-- <div
+                onclick="window.open('https://www.haleonhealthpartner.com/en-eg/news-events/events-and-webinars/haleon-partners-club-beyond-the-counter/', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/banner1.jpg" alt="Haleon Hero Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div> -->
+              <div onclick="window.open('', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/Banners/CentrumEnergy_KV19.2_EN.png" alt="Panadol Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div>
+            </div>
+
+            <!-- Banner 2: Centrum -->
+            <div class="carousel-slide" id="slide-banner-centrum" style="height: auto;">
+              <div onclick="window.open('', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/Banners/Centrum Energy KV Arabic.jpg" alt="Centrum Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div>
+            </div>
+            <div class="carousel-slide" id="slide-banner-centrum" style="height: auto;">
+              <div onclick="window.open('', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/Banners/Dhafer.jpg" alt="Centrum Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div>
+            </div>
+            <div class="carousel-slide" id="slide-banner-centrum" style="height: auto;">
+              <div onclick="window.open('', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/Banners/Panadaol-EXT-OBT_clean-01.png" alt="Centrum Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div>
+            </div>
+            <div class="carousel-slide" id="slide-banner-centrum" style="height: auto;">
+              <div onclick="window.open('', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/Banners/Tara.jpg" alt="Centrum Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div>
+            </div>
+            <div class="carousel-slide" id="slide-banner-centrum" style="height: auto;">
+              <div onclick="window.open('', '_blank')"
+                style="width: 100%; border-radius: 16px; border: 1px solid var(--green); cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(46, 231, 1, 0.15);">
+                <img src="assets/Banners/Updated Combined KV.jpg" alt="Centrum Banner"
+                  style="width: 100%; height: auto; display: block;">
+              </div>
+            </div>
+
+            <!-- Physical card link banner slide -->
+            <!-- <div class="carousel-slide" id="slide-banner-card" style="height: auto;">
+              <div class="registration-reminder" onclick="openCardLinkDialog()"
+                style="width: 100%; background: linear-gradient(135deg, #0d1a2e, #1a3a5a); border-radius: 16px; padding: 20px; border: 1px solid #60a5fa; cursor: pointer; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 15px rgba(96, 165, 250, 0.1);">
+                <div style="font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 6px;">Link Your Physical Card</div>
+                <div style="font-size: 0.85rem; color: #a1b0c0;">Tap here to scan your card and connect it to your account.</div>
+              </div>
+            </div> -->
+
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. MYSTERY SHOPPER SECTION -->
+      <div class="section" style="padding-top: 0;">
+        <div class="section-title">Mystery Shopper</div>
+        <div class="mystery-shopper-container" onclick="openMysteryShopperView()"
+          style="cursor: pointer; margin-bottom: 20px;">
+          <div class="mystery-title-wrap">
+            <div class="mystery-icon-box">🕵️‍♂️</div>
+            <div>
+              <div class="mystery-title-text">Mystery Shopper</div>
+              <div class="mystery-sub-text">Watch videos & unlock the Spin to Win game!</div>
+            </div>
+          </div>
+          <div style="color: #818cf8; font-weight: 700; font-size: 1.2rem;">➔</div>
+        </div>
+      </div>
+
+      <!-- CONTINUE WHERE YOU LEFT SECTION -->
+      <div class="section" id="continue-watching-section" style="padding-top: 0; display: none;">
+        <div class="section-title">Continue Where You Left</div>
+        <div class="continue-watching-card" id="continue-watching-card" onclick="resumeLastVideo()"
+          style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.95) 0%, rgba(49, 46, 129, 0.95) 100%); border: 1.5px solid #818cf8; border-radius: var(--radius); padding: 16px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 20px rgba(129, 140, 248, 0.2); cursor: pointer; transition: transform 0.2s;">
+          <div style="display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0;">
+            <div
+              style="width: 44px; height: 44px; border-radius: 12px; background: rgba(129, 140, 248, 0.2); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; color: #a5b4fc;">
+              ▶️
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div id="continue-video-title"
+                style="font-size: 0.98rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                Video Title
+              </div>
+              <div id="continue-video-sub"
+                style="font-size: 0.8rem; color: #c7d2fe; margin-top: 2px; display: flex; align-items: center; gap: 8px;">
+                <span id="continue-video-time">Resume at 0:00</span>
+              </div>
+            </div>
+          </div>
+          <button class="btn-primary"
+            style="padding: 8px 16px; font-size: 0.82rem; border-radius: 20px; font-weight: 700; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #fff; border: none; flex-shrink: 0; box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4);">
+            Resume ▶
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. FEATURED VIDEO OF THE WEEK SECTION -->
+      <div class="section" style="padding-top: 0;">
+        <div class="section-title">Featured Video Of the Week</div>
+        <div class="video-card-wrap" style="margin-bottom: 20px;">
+          <div class="video-card-header">
+            <div class="video-card-title">About The Program</div>
+            <!-- <div class="video-reward-tag">+15 Points</div> -->
+          </div>
+          <div class="video-player-container">
+            <video id="featured-video-player" controls poster="assets/Brought To You By.png"
+              onended="claimVideoPoints()">
+              <source src="assets/Haleon Mobile App_Hz.mp4" type="video/mp4">
+              Your browser does not support HTML5 video.
+            </video>
+          </div>
+          <div
+            style="padding: 12px 16px; background: var(--surface2); font-size: 0.8rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+            <span>Watch to the end to earn 15 points</span>
+            <span id="video-claim-status" style="color: var(--green); font-weight: 600;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. QUIZ OF THE WEEK SECTION -->
+      <div class="section" style="padding-top: 0;">
+        <div class="section-title">Quiz Of The Week</div>
+        <div class="quiz-banner-card" onclick="openQuizView()" style="margin-bottom: 20px;">
+          <div>
+            <span class="quiz-banner-badge" id="quiz-banner-badge">Weekly Challenge</span>
+            <div style="font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 4px;">Haleon Products Quiz
+            </div>
+            <div style="font-size: 0.85rem; color: #a1b0c0;" id="quiz-banner-sub">5 Questions • Earn +10 Points per
+              question</div>
+          </div>
+          <div id="quiz-banner-icon"
+            style="background: var(--green); color: #000; width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; font-weight: 800; flex-shrink: 0; transition: all 0.3s ease;">
+            ➔
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. RECENTLY ADDED HIGHLIGHTS SECTION -->
+      <div class="section" style="padding-top: 0;">
+        <div class="section-title">Recently Added Highlights</div>
+        <div class="carousel-wrap" style="margin-bottom: 20px;">
+          <div class="carousel-track" id="carousel-track">
+            <div class="carousel-slide">
+              <div class="carousel-card-box" style="background:linear-gradient(135deg,#0d2818,#1a4a2e)">
+                <div class="carousel-text">
+                  <div class="carousel-title">Sensodyne Science Webinar</div>
+                  <div class="carousel-sub">Dentine Hypersensitivity Management • New Upload</div>
+                </div>
+                <div class="carousel-emoji">📺</div>
+              </div>
+            </div>
+            <div class="carousel-slide">
+              <div class="carousel-card-box" style="background:linear-gradient(135deg,#1a1a0d,#3a3a10)">
+                <div class="carousel-text">
+                  <div class="carousel-title">Panadol Clinical Evidence</div>
+                  <div class="carousel-sub">Fast absorption technology presentation deck</div>
+                </div>
+                <div class="carousel-emoji">📄</div>
+              </div>
+            </div>
+            <div class="carousel-slide">
+              <div class="carousel-card-box" style="background:linear-gradient(135deg,#0d1a2e,#1a3a5a)">
+                <div class="carousel-text">
+                  <div class="carousel-title">AASTMT Certification</div>
+                  <div class="carousel-sub">Complete 3 webinars to earn your certificate</div>
+                </div>
+                <div class="carousel-emoji">🎓</div>
+              </div>
+            </div>
+          </div>
+          <div class="carousel-dots" id="highlights-dots-container">
+            <span class="dot active" onclick="goToSlide(0)"></span>
+            <span class="dot" onclick="goToSlide(1)"></span>
+            <span class="dot" onclick="goToSlide(2)"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. CLINICAL TIP OF THE DAY SECTION -->
+      <div class="section" style="padding-top: 0; padding-bottom: 20px;">
+        <div class="section-title">Clinical Tip of the Day</div>
+        <div
+          style="background: var(--surface2); border: 1px solid var(--border); border-left: 4px solid var(--green); border-radius: 14px; padding: 18px 20px;">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <span style="font-size: 1.2rem;">💡</span>
+            <strong style="font-size: 0.95rem; color: #fff;">Patient Communication Tip</strong>
+          </div>
+          <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">
+            When recommending Sensodyne for dentine hypersensitivity, advise patients to use it twice daily continuously
+            for long-lasting sensitivity protection rather than stopping when relief is felt.
+          </p>
+        </div>
+
+        <!-- COMMENTED OUT ORIGINAL HOME GAMES GRID & BADGES TO PRESERVE CODE SNAPSHOTS -->
+        <!--
+      <div class="section-title" style="padding: 0 24px;">Games Hub</div>
+      <div class="quiz-grid" id="games-grid-old">...</div>
+      -->
+        <!-- <div style="margin-top: 20px;">
+        <div class="section-title">Your Badges</div>
+        <div class="badges-row">
+          <div class="badge-chip locked" id="badge-0" onclick="tryClaimBadge(0)">
+            <div class="badge-icon" style="background:rgba(74,222,128,0.06)">
+              <img src="assets/Health Advocate.png" alt="Health Advocate" style="width: 32px; height: 32px; object-fit: contain;">
+            </div>
+            <div class="badge-name">Health Advocate</div>
+            <div class="badge-pts">200 pts</div>
+          </div>
+          <div class="badge-chip locked" id="badge-1" onclick="tryClaimBadge(1)">
+            <div class="badge-icon" style="background:rgba(74,222,128,0.06)">
+              <img src="assets/Daily Mover.png" alt="Daily Mover" style="width: 32px; height: 32px; object-fit: contain;">
+            </div>
+            <div class="badge-name">Daily Mover</div>
+            <div class="badge-pts">400 pts</div>
+          </div>
+          <div class="badge-chip locked" id="badge-2" onclick="tryClaimBadge(2)">
+            <div class="badge-icon" style="background:rgba(74,222,128,0.06)">
+              <img src="assets/Wellness Leader.png" alt="Wellness Leader" style="width: 32px; height: 32px; object-fit: contain;">
+            </div>
+            <div class="badge-name">Wellness Leader</div>
+            <div class="badge-pts">600 pts</div>
+          </div>
+        </div>
+      </div> -->
+
+      </div>
+
+      <!-- 7. OUR PARTNERS SECTION -->
+      <div class="section" style="padding-top: 0; padding-bottom: 24px;">
+        <div class="section-title">Our Partners</div>
+        <div
+          style="background: linear-gradient(135deg, rgba(17, 20, 24, 0.95) 0%, rgba(24, 28, 33, 0.95) 100%); border: 1px solid var(--border); border-radius: 16px; padding: 24px 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+          <img src="assets/AASTMT_Logo.png" alt="Partner Logo"
+            style="max-width: 150px; max-height: 85px; object-fit: contain; filter: drop-shadow(0 2px 8px rgba(255,255,255,0.1));">
+          <div style="font-size: 0.95rem; font-weight: 800; color: #ffffff; line-height: 1.4;">
+            Arab Academy for Science, Technology & Maritime Transport (AASTMT)
+          </div>
+          <p style="font-size: 0.82rem; color: var(--muted); line-height: 1.5; margin: 0; max-width: 440px;">
+            In official academic partnership with Haleon Partners Club to empower healthcare professionals with accredited learning and scientific development.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED QUIZ VIEW (QUIZ OF THE WEEK) -->
+    <div class="view" id="view-quiz">
+      <div class="top-navbar">
+        <button class="btn-secondary" style="width: auto; padding: 6px 14px; font-size: 0.85rem;"
+          onclick="showView('view-home')">← Back Home</button>
+        <div style="font-weight: 700; color: #fff;">Quiz of the Week</div>
+        <div style="width: 70px;"></div>
+      </div>
+
+      <div class="quiz-view-container">
+        <div class="quiz-progress-bar">
+          <div class="quiz-progress-fill" id="quiz-progress-fill"></div>
+        </div>
+
+        <div class="quiz-question-card" id="quiz-card-box">
+          <div class="quiz-question-number" id="quiz-q-num">Question 1 of 5</div>
+          <div class="quiz-question-text" id="quiz-q-text">Loading question...</div>
+        </div>
+
+        <div class="quiz-options-list" id="quiz-options-container">
+          <!-- Options rendered dynamically -->
+        </div>
+
+        <button class="btn-primary" id="btn-next-quiz" onclick="nextQuizQuestion()">Next Question ➔</button>
+      </div>
+    </div>
+
+    <!-- DEDICATED MYSTERY SHOPPER VIEW -->
+    <div class="view" id="view-mystery">
+      <div class="top-navbar">
+        <button class="btn-secondary" style="width: auto; padding: 6px 14px; font-size: 0.85rem;"
+          onclick="showView('view-home')">← Back Home</button>
+        <div style="font-weight: 700; color: #fff;">Mystery Shopper</div>
+        <div style="width: 70px;"></div>
+      </div>
+
+      <div class="section" style="padding-top: 16px;">
+        <!-- MYSTERY SHOPPER HEADER CARD -->
+        <div
+          style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border: 1px solid #818cf8; border-radius: var(--radius); padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(129, 140, 248, 0.15); text-align: center;">
+          <div style="font-size: 2.5rem; margin-bottom: 8px;">🕵️‍♂️</div>
+          <div style="font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 6px;">Mystery Shopper Challenge
+          </div>
+          <div style="font-size: 0.88rem; color: #c7d2fe; max-width: 400px; margin: 0 auto; line-height: 1.4;">
+            Watch the mystery shopper videos below to test your observation skills and unlock the <strong>Spin to
+              Win</strong> game!
+          </div>
+        </div>
+
+        <!-- MYSTERY SHOPPER VIDEOS GRID -->
+        <div id="mystery-shopper-videos-container"
+          style="background: rgba(13, 26, 46, 0.6); padding: 16px; border-radius: 16px; border: 1px solid rgba(129, 140, 248, 0.3); margin-bottom: 20px;">
+          <div
+            style="font-size: 0.9rem; font-weight: 700; color: #818cf8; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>🎬 Select a Video to Watch</span>
+          </div>
+          <div class="brand-videos-grid" style="margin-top: 0;">
+            <!-- Video 1: Panadol Dissolution Arabic -->
+            <div class="brand-video-card"
+              onclick="playBrandVideo('assets/Mystery Shopper/Panadol_Dissolution_Arabic_V6.mp4', 'Panadol Dissolution (Arabic)', 'v1')">
+              <div class="brand-video-thumb-box">
+                <video src="assets/Mystery Shopper/Panadol_Dissolution_Arabic_V6.mp4#t=1" preload="metadata" muted
+                  playsinline></video>
+                <div class="brand-video-play-badge">▶</div>
+              </div>
+              <div class="brand-video-info">
+                <div class="brand-video-title">Panadol Dissolution (Arabic)</div>
+                <div
+                  style="font-size: 0.72rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+                  <span>🎬 Video</span>
+                  <span style="background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px;">3 mins</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Video 2: Panadol Dissolution English -->
+            <div class="brand-video-card"
+              onclick="playBrandVideo('assets/Mystery Shopper/Panadol_Dissolution_video English.mp4', 'Panadol Dissolution (English)', 'v2')">
+              <div class="brand-video-thumb-box">
+                <video src="assets/Mystery Shopper/Panadol_Dissolution_video English.mp4#t=1" preload="metadata" muted
+                  playsinline></video>
+                <div class="brand-video-play-badge">▶</div>
+              </div>
+              <div class="brand-video-info">
+                <div class="brand-video-title">Panadol Dissolution (English)</div>
+                <div
+                  style="font-size: 0.72rem; color: var(--muted); display: flex; justify-content: space-between; align-items: center;">
+                  <span>🎬 Video</span>
+                  <span style="background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px;">3 mins</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MYSTERY SHOPPER QUESTION BUTTON -->
+          <div style="margin-top: 16px; text-align: center;">
+            <button id="mystery-shopper-question-btn" class="mystery-question-btn disabled" disabled
+              onclick="openMysteryShopperQuestionModal()">
+              🔒 Watch Videos (0/2)
+            </button>
+          </div>
+
+          <!-- MYSTERY SHOPPER COMPLETED CARD -->
+          <div id="mystery-shopper-completed-card"
+            style="display: none; margin-top: 16px; background: linear-gradient(135deg, rgba(30, 27, 75, 0.95) 0%, rgba(49, 46, 129, 0.95) 100%); border: 1.5px solid #4ade80; border-radius: 16px; padding: 20px; text-align: center; box-shadow: 0 4px 20px rgba(74, 222, 128, 0.25);">
+            <div style="font-size: 2.5rem; margin-bottom: 6px;">🎉</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: #4ade80; margin-bottom: 6px;">
+              Challenge Completed!
+            </div>
+            <div style="font-size: 0.9rem; color: #e2e8f0; margin-bottom: 16px; line-height: 1.4; font-weight: 500;">
+              You have completed this challenge and you collected its reward
+            </div>
+            <div
+              style="display: inline-flex; align-items: center; gap: 14px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(74, 222, 128, 0.35); border-radius: 14px; padding: 12px 20px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);">
+              <img id="mystery-completed-reward-img" src="" alt="Reward"
+                style="width: 54px; height: 54px; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));">
+              <div style="text-align: left;">
+                <div
+                  style="font-size: 0.75rem; color: #818cf8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+                  Reward Collected</div>
+                <div id="mystery-completed-reward-title" style="font-size: 1.05rem; font-weight: 800; color: #ffffff;">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GAMES & ACTIVITIES VIEW -->
+    <div class="view" id="view-games">
+      <div class="top-navbar">
+        <div class="top-nav-greeting">Games & Activities 🎮</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div class="section" style="padding-top: 16px;">
+
+        <!-- TIER PROGRESS CARD WIDGET -->
+        <div class="tier-card-widget" id="tier-card-games">
+          <div class="tier-card-header">
+            <div class="tier-card-name"><span id="tc-name-games">No Tier</span></div>
+            <div class="tier-card-pts"><span id="tc-pts-games">0</span> pts</div>
+          </div>
+          <div class="tier-card-bar-bg">
+            <div class="tier-card-bar-fill" id="tc-fill-games" style="width: 0%;"></div>
+          </div>
+          <div class="tier-card-footer">
+            <span id="tc-next-games">500 pts to Bronze tier</span>
+          </div>
+        </div>
+
+        <div class="section-title">Product Games</div>
+        <div class="quiz-grid" id="games-grid">
+          <div class="quiz-grid-card" onclick="openGame('game_basket.html', 'basket')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/build basket/buildBasket_gameLogo.png" alt="Build Basket"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Build Basket</div>
+            <div class="quiz-grid-status" id="gstatus-basket">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_myth.html', 'myth')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/Myth & Fact/Myth&Fact_gameLogo.png" alt="Myth vs Fact"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Myth vs Fact</div>
+            <div class="quiz-grid-status" id="gstatus-myth">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_buzzer.html', 'buzzer')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/buzzer battle/buzzerBattle_gameLogo.png" alt="Buzzer Battle"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Buzzer Battle</div>
+            <div class="quiz-grid-status" id="gstatus-buzzer">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_mitohype.html', 'mitohype')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/Fever Smach/gameLogo.png" alt="Fever Game"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Fever Smach</div>
+            <div class="quiz-grid-status" id="gstatus-mitohype">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_match.html', 'match')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/Matching Game/gameLogo.png" alt="Match Game"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Match Game</div>
+            <div class="quiz-grid-status" id="gstatus-match">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_spot.html', 'spot')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/Spot Game/gameLogo.png" alt="Spot Game"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Spot the Opportunity</div>
+            <div class="quiz-grid-status" id="gstatus-spot">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_placement.html', 'placement')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/Perfect Shelf/gameLogo.png" alt="Perfect Shelf"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Perfect Shelf Builder</div>
+            <div class="quiz-grid-status" id="gstatus-placement">Play</div>
+          </div>
+          <!-- NEWLY ADDED GAMES: MEMORY & SPIN -->
+          <div class="quiz-grid-card" onclick="openGame('game_memory.html', 'memory')">
+            <div class="quiz-grid-num" style="background:rgba(96, 165, 250, 0.15); border-color:#60a5fa;">
+              <img src="assets/memory game/memoryGameIcon.png" alt="Memory Challenge"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Memory Challenge</div>
+            <div class="quiz-grid-status" id="gstatus-memory">Play</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openSpinGameWeekly()">
+            <div class="quiz-grid-num" style="background:rgba(247, 167, 6, 0.15); border-color:#f7a706;">
+              <img src="assets/Spin Game/Spin.png" alt="Spin to Win"
+                style="width: 28px; height: 28px; object-fit: contain;">
+            </div>
+            <div class="quiz-grid-label">Spin to Win</div>
+            <div class="quiz-grid-status" id="gstatus-spin">1x / Week</div>
+          </div>
+          <div class="quiz-grid-card" onclick="openGame('game_word.html', 'word')">
+            <div class="quiz-grid-num" style="background:rgba(74,222,128,0.15); border-color:var(--green);">
+              🔍
+            </div>
+            <div class="quiz-grid-label">Word Search</div>
+            <div class="quiz-grid-status" id="gstatus-word">Play</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDUCATION VIEW -->
+    <div class="view profile-view" id="view-education" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Education Hub 📚</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <div class="page-sub" style="margin-bottom: 20px;">Explore Haleon professional learning modules & certifications
+        </div>
+
+        <!-- TIER PROGRESS CARD WIDGET -->
+        <div class="tier-card-widget" id="tier-card-education">
+          <div class="tier-card-header">
+            <div class="tier-card-name"><span id="tc-name-education">No Tier</span></div>
+            <div class="tier-card-pts"><span id="tc-pts-education">0</span> pts</div>
+          </div>
+          <div class="tier-card-bar-bg">
+            <div class="tier-card-bar-fill" id="tc-fill-education" style="width: 0%;"></div>
+          </div>
+          <div class="tier-card-footer">
+            <span id="tc-next-education">500 pts to Bronze tier</span>
+          </div>
+        </div>
+
+        <!-- 1. Full Webinars -->
+        <div class="edu-nav-card" onclick="showView('view-edu-webinars')">
+          <div class="edu-nav-icon-title">
+            <div class="edu-nav-icon">📹</div>
+            <div class="edu-nav-text">
+              <div class="edu-nav-title">Full Webinars</div>
+              <div class="edu-nav-sub">Watch recorded scientific sessions & webinars</div>
+            </div>
+          </div>
+          <div class="edu-nav-arrow">➔</div>
+        </div>
+
+        <!-- 2. KNOWLEDGE CAPSULES -->
+        <div class="edu-nav-card" onclick="showView('view-edu-capsules')">
+          <div class="edu-nav-icon-title">
+            <div class="edu-nav-icon">💊</div>
+            <div class="edu-nav-text">
+              <div class="edu-nav-title">Knowledge Capsules</div>
+              <div class="edu-nav-sub">Short 2-5 min quick bite clinical videos</div>
+            </div>
+          </div>
+          <div class="edu-nav-arrow">➔</div>
+        </div>
+
+        <!-- 3. EXPERT PRESENTATIONS -->
+        <div class="edu-nav-card" onclick="showView('view-edu-presentations')">
+          <div class="edu-nav-icon-title">
+            <div class="edu-nav-icon">📊</div>
+            <div class="edu-nav-text">
+              <div class="edu-nav-title">Expert Presentations</div>
+              <div class="edu-nav-sub">Clinical slide decks & expert masterclasses</div>
+            </div>
+          </div>
+          <div class="edu-nav-arrow">➔</div>
+        </div>
+
+        <!-- 4. PRODUCT KNOWLEDGE CENTER -->
+        <div class="edu-nav-card" onclick="showView('view-edu-product-center')">
+          <div class="edu-nav-icon-title">
+            <div class="edu-nav-icon">🏥</div>
+            <div class="edu-nav-text">
+              <div class="edu-nav-title">Product Knowledge Center</div>
+              <div class="edu-nav-sub">Brand studies, TVCs, & patient recommendation guides</div>
+            </div>
+          </div>
+          <div class="edu-nav-arrow">➔</div>
+        </div>
+
+        <!-- 5. AASTMT CERTIFICATION PROGRAM -->
+        <div class="edu-nav-card" onclick="showView('view-edu-aastmt')">
+          <div class="edu-nav-icon-title">
+            <div class="edu-nav-icon">🎓</div>
+            <div class="edu-nav-text">
+              <div class="edu-nav-title">AASTMT Academy Certification Program</div>
+              <div class="edu-nav-sub">Accredited program modules & digital certificate</div>
+            </div>
+          </div>
+          <div class="edu-nav-arrow">➔</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED SUB-VIEW 1: PREVIOUS WEBINARS -->
+    <div class="view profile-view" id="view-edu-webinars" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Previous Webinars 📹</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-education')">← Back to Education</button>
+
+        <!-- SEARCH & TAG FILTERS -->
+        <div class="edu-search-box" style="margin-bottom: 12px;">
+          <span>🔍</span>
+          <input type="text" id="webinar-search-input" placeholder="Search by title, speaker (e.g. Dr. Ahmed), brand..."
+            oninput="filterWebinars()">
+        </div>
+
+        <div class="edu-filter-chips" id="webinar-filter-chips" style="margin-bottom: 16px;">
+          <!-- Dynamically populated from webinars.json -->
+        </div>
+
+        <!-- WEBINARS GRID CONTAINER -->
+        <div id="webinars-grid-container" class="edu-card-grid" style="margin-top: 10px;">
+          <!-- Dynamically populated by renderWebinars() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED WEBINAR VIDEO PLAYER SCREEN -->
+    <div class="view profile-view" id="view-webinar-player" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Webinar Session 📹</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-edu-webinars')">← Back to Webinars</button>
+
+        <!-- Player Box -->
+        <div id="player-screen-video-box"
+          style="width: 100%; aspect-ratio: 16/9; border-radius: 16px; overflow: hidden; background: #000; position: relative; margin-bottom: 12px; border: 1px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,0.5);">
+          <iframe id="player-screen-iframe" src="" style="width: 100%; height: 100%; border: none;"
+            allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+        </div>
+
+        <!-- Fullscreen Horizontal Toggle Button -->
+        <button class="btn-secondary"
+          style="margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; background: rgba(74,222,128,0.1); border-color: rgba(74,222,128,0.4); color: var(--green);"
+          onclick="toggleVideoFullscreen()">
+          <span style="font-size: 1.1rem;">⛶</span> Fullscreen
+        </button>
+
+        <!-- Session Details Card -->
+        <div
+          style="background: var(--surface2); border: 1px solid var(--border); border-radius: 16px; padding: 18px; margin-bottom: 20px;">
+          <h2 id="player-screen-title"
+            style="font-size: 1.15rem; font-weight: 700; color: #fff; margin-bottom: 12px; line-height: 1.3;">Webinar
+            Session</h2>
+
+          <div id="player-screen-tags" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;">
+            <!-- Dynamic tags -->
+          </div>
+
+          <div id="player-screen-desc"
+            style="font-size: 0.85rem; color: #a1b0c0; line-height: 1.5; border-top: 1px solid var(--border); padding-top: 12px;">
+            <!-- Dynamic description -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED SUB-VIEW 2: KNOWLEDGE CAPSULES -->
+    <div class="view profile-view" id="view-edu-capsules" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Knowledge Capsules 💊</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-education')">← Back to Education</button>
+
+        <div id="capsules-grid-container" class="edu-card-grid" style="margin-top: 10px;">
+          <!-- Dynamically populated by renderCapsules() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED SUB-VIEW 3: EXPERT PRESENTATIONS -->
+    <div class="view profile-view" id="view-edu-presentations"
+      style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Expert Presentations 📊</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-education')">← Back to Education</button>
+
+        <!-- Search Bar -->
+        <div class="edu-search-box" style="margin-bottom: 16px;">
+          <span>🔍</span>
+          <input type="text" id="presentation-search-input" placeholder="Search presentation materials..."
+            oninput="renderPresentations()">
+        </div>
+
+        <div id="presentations-grid-container" class="edu-card-grid" style="margin-top: 10px;">
+          <!-- Dynamically populated by renderPresentations() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED SUB-VIEW 4: PRODUCT KNOWLEDGE CENTER -->
+    <div class="view profile-view" id="view-edu-product-center"
+      style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Product Knowledge Center 🏥</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-education')">← Back to Education</button>
+
+        <div class="edu-card-grid" style="margin-top: 10px;">
+          <!-- 1. CENTRUM -->
+          <div class="edu-item-card" style="border-color: #facc15; cursor: pointer;"
+            onclick="openBrandVideosScreen('Centrum')">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="assets/Centrum_logo_white.png" alt="Centrum" style="height: 24px; object-fit: contain;">
+                <strong style="font-size: 1rem; color: #fff;">Centrum</strong>
+              </div>
+              <span class="edu-nav-arrow" style="width: 28px; height: 28px; font-size: 0.8rem;">➔</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--muted); line-height: 1.5;">Educational TVCs & Multivitamin
+              Product Guides</div>
+          </div>
+
+          <!-- 2. PANADOL -->
+          <div class="edu-item-card" style="border-color: var(--green); cursor: pointer;"
+            onclick="openBrandVideosScreen('Panadol')">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="assets/Panadol_logo.png" alt="Panadol" style="height: 40px; object-fit: contain;">
+                <strong style="font-size: 1rem; color: #fff;">Panadol</strong>
+              </div>
+              <span class="edu-nav-arrow" style="width: 28px; height: 28px; font-size: 0.8rem;">➔</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--muted); line-height: 1.5;">Dissolution Technology & Fast Pain
+              Relief Videos</div>
+          </div>
+
+          <!-- 3. SENSODYNE -->
+          <div class="edu-item-card" style="border-color: #60a5fa; cursor: pointer;"
+            onclick="openBrandVideosScreen('Sensodyne')">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <img src="assets/senso _logo.png" alt="Sensodyne" style="height: 24px; object-fit: contain;">
+                <strong style="font-size: 1rem; color: #fff;">Sensodyne</strong>
+              </div>
+              <span class="edu-nav-arrow" style="width: 28px; height: 28px; font-size: 0.8rem;">➔</span>
+            </div>
+            <div style="font-size: 0.8rem; color: var(--muted); line-height: 1.5;">Clinical Studies & Oral Sensitivity
+              Overview Videos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED BRAND KNOWLEDGE VIDEOS SCREEN -->
+    <div class="view profile-view" id="view-brand-videos" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting" id="brand-videos-top-title">Brand Videos 🎬</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-edu-product-center')">← Back to Product Knowledge
+          Center</button>
+
+        <div class="page-sub" id="brand-videos-sub" style="margin-bottom: 16px;">Explore brand educational and
+          scientific videos</div>
+
+        <!-- 2 IN A ROW GRID CONTAINER -->
+        <div id="brand-videos-grid-container" class="brand-videos-grid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- DEDICATED SUB-VIEW 5: AASTMT CERTIFICATION PROGRAM -->
+    <div class="view profile-view" id="view-edu-aastmt" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">AASTMT Certification 🎓</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <button class="edu-back-btn" onclick="showView('view-education')">← Back to Education</button>
+
+        <!-- AASTMT LOGO CONTAINER CARD -->
+        <div
+          style="background: linear-gradient(135deg, #111e15 0%, #0d1a2e 100%); border: 1px solid var(--green); border-radius: 18px; padding: 24px 20px; margin-top: 14px; margin-bottom: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); text-align: center; display: flex; align-items: center; justify-content: center;">
+          <img src="assets/AASTMT_Logo.png" alt="AASTMT Logo"
+            style="max-height: 130px; width: 85%; max-width: 340px; height: auto; object-fit: contain; display: block; margin: 0 auto; filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5));">
+        </div>
+
+        <!-- 1. LEARNING JOURNEY CARD -->
+        <div
+          style="background: linear-gradient(135deg, #111e15 0%, #0d1a2e 100%); border: 1px solid var(--green); border-radius: 18px; padding: 20px; margin-top: 10px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);">
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid rgba(74, 222, 128, 0.2); padding-bottom: 10px;">
+            <strong style="font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <span>🚀</span> Learning Journey
+            </strong>
+            <span
+              style="background: rgba(74, 222, 128, 0.15); color: var(--green); border: 1px solid rgba(74, 222, 128, 0.3); font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 20px;">5
+              Steps</span>
+          </div>
+
+          <ul
+            style="font-size: 0.85rem; color: var(--muted); line-height: 1.6; padding-left: 18px; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+            <li><strong style="color: #fff;"></strong> Attend or watch 3 selected webinars.</li>
+            <li><strong style="color: #fff;"></strong> Complete the associated learning materials and knowledge
+              capsules.</li>
+            <li><strong style="color: #fff;"></strong> Take the AASTMT Assessment (multiple-choice online test).</li>
+            <li><strong style="color: #fff;"></strong> Achieve the minimum passing score (e.g., 70%).</li>
+            <li><strong style="color: #fff;"></strong> Receive an AASTMT-accredited digital certificate upon successful
+              completion.</li>
+          </ul>
+        </div>
+
+        <!-- 2. ASSESSMENT CARDS (MATCHING SKETCH: 2 IN TOP ROW, 1 IN BOTTOM ROW) -->
+        <div style="margin-bottom: 24px;">
+          <div
+            style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+            <span>📝</span> AASTMT Assessments
+          </div>
+
+          <!-- TOP ROW: ASSESSMENT 1 & ASSESSMENT 2 -->
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 14px;">
+            <!-- ASSESSMENT 1 -->
+            <div class="edu-item-card"
+              style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 16px; border-color: rgba(255, 255, 255, 0.15); cursor: pointer;"
+              onclick="showToast('Assessment 1 is locked. Complete required webinars to unlock.')">
+              <div
+                style="width: 56px; height: 56px; background: rgba(255, 255, 255, 0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <img src="assets/Lock.png" alt="Locked" style="width: 30px; height: 30px; object-fit: contain;">
+              </div>
+              <div style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 4px;">Assessment 1</div>
+              <span
+                style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; margin-top: 4px;">🔒
+                Locked</span>
+            </div>
+
+            <!-- ASSESSMENT 2 -->
+            <div class="edu-item-card"
+              style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 16px; border-color: rgba(255, 255, 255, 0.15); cursor: pointer;"
+              onclick="showToast('Assessment 2 is locked. Complete required webinars to unlock.')">
+              <div
+                style="width: 56px; height: 56px; background: rgba(255, 255, 255, 0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <img src="assets/Lock.png" alt="Locked" style="width: 30px; height: 30px; object-fit: contain;">
+              </div>
+              <div style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 4px;">Assessment 2</div>
+              <span
+                style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; margin-top: 4px;">🔒
+                Locked</span>
+            </div>
+          </div>
+
+          <!-- BOTTOM ROW: ASSESSMENT 3 (FULL WIDTH/CENTERED) -->
+          <div class="edu-item-card"
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px 16px; border-color: rgba(255, 255, 255, 0.15); cursor: pointer;"
+            onclick="showToast('Assessment 3 is locked. Complete required webinars to unlock.')">
+            <div
+              style="width: 56px; height: 56px; background: rgba(255, 255, 255, 0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+              <img src="assets/Lock.png" alt="Locked" style="width: 30px; height: 30px; object-fit: contain;">
+            </div>
+            <div style="font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 4px;">Assessment 3</div>
+            <span
+              style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 0.72rem; font-weight: 700; padding: 2px 10px; border-radius: 12px; margin-top: 4px;">🔒
+              Locked</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR VIEW -->
+    <div class="view profile-view" id="view-calendar" style="padding-top: 0; padding-left: 0; padding-right: 0;">
+      <div class="top-navbar" style="margin-bottom: 16px;">
+        <div class="top-nav-greeting">Events Calendar 📅</div>
+        <button class="logout-btn" onclick="doLogout()">Log Out</button>
+      </div>
+
+      <div style="padding: 0 clamp(16px, 4vw, 32px);">
+        <div class="page-sub" style="margin-bottom:20px">Explore upcoming Haleon educational & partner events</div>
+
+        <!-- 1. WEBINARS ACCORDION -->
+        <div class="accordion-card" id="cal-sec-webinars">
+          <div class="accordion-header" onclick="toggleAccordion('cal-sec-webinars')">
+            <div class="accordion-icon-title">
+              <span style="font-size: 1.2rem;">🌐</span>
+              <span>Webinars</span>
+            </div>
+            <div class="accordion-arrow">▼</div>
+          </div>
+          <div class="accordion-content">
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: #fff;">Sensodyne Science Webinar 2026: Dentine
+                Hypersensitivity Breakthroughs</div>
+              <div style="font-size: 0.82rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px;">
+                <div>📅 <strong>Time:</strong> Thursday, August 20, 2026 • 7:00 PM (EGT)</div>
+                <div>📍 <strong>Location:</strong> Online Stream / Virtual Room</div>
+                <div style="margin-top: 4px; line-height: 1.4; color: #a1b0c0;">Deep dive into occlusion technology and
+                  rapid relief mechanisms in modern oral healthcare.</div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button class="btn-primary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="registerEvent('https://haleon.com/')">
+                  <span>🔗</span> Register
+                </button>
+                <button class="btn-secondary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="addToCalendar('Sensodyne Science Webinar 2026', 'Dentine Hypersensitivity Breakthroughs', 'Online Stream', '2026-08-20T19:00:00', '2026-08-20T20:30:00')">
+                  <span>📅</span> Add to Calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. WORKSHOPS ACCORDION -->
+        <div class="accordion-card" id="cal-sec-workshops">
+          <div class="accordion-header" onclick="toggleAccordion('cal-sec-workshops')">
+            <div class="accordion-icon-title">
+              <span style="font-size: 1.2rem;">🛠️</span>
+              <span>Workshops</span>
+            </div>
+            <div class="accordion-arrow">▼</div>
+          </div>
+          <div class="accordion-content">
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: #fff;">Pharmacy Practice & Patient Counseling
+                Workshop</div>
+              <div style="font-size: 0.82rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px;">
+                <div>📅 <strong>Time:</strong> Wednesday, September 2, 2026 • 5:00 PM (EGT)</div>
+                <div>📍 <strong>Location:</strong> InterContinental Cairo Citystars / Virtual Hybrid</div>
+                <div style="margin-top: 4px; line-height: 1.4; color: #a1b0c0;">Practical clinical case studies for
+                  frontline pharmacists on recommending targeted oral care treatments.</div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button class="btn-primary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="registerEvent('https://haleon.com/')">
+                  <span>🔗</span> Register
+                </button>
+                <button class="btn-secondary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="addToCalendar('Pharmacy Practice Workshop', 'Patient Counseling Workshop', 'InterContinental Cairo Citystars', '2026-09-02T17:00:00', '2026-09-02T19:00:00')">
+                  <span>📅</span> Add to Calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. CONFERENCES ACCORDION -->
+        <div class="accordion-card" id="cal-sec-conferences">
+          <div class="accordion-header" onclick="toggleAccordion('cal-sec-conferences')">
+            <div class="accordion-icon-title">
+              <span style="font-size: 1.2rem;">🏛️</span>
+              <span>Conferences</span>
+            </div>
+            <div class="accordion-arrow">▼</div>
+          </div>
+          <div class="accordion-content">
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: #fff;">Annual Haleon Healthcare Partners
+                Symposium 2026</div>
+              <div style="font-size: 0.82rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px;">
+                <div>📅 <strong>Time:</strong> Friday, October 15, 2026 • 10:00 AM (EGT)</div>
+                <div>📍 <strong>Location:</strong> Grand Nile Tower, Cairo</div>
+                <div style="margin-top: 4px; line-height: 1.4; color: #a1b0c0;">Keynote lectures by regional dental &
+                  medical experts showcasing clinical trials and health innovations.</div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button class="btn-primary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="registerEvent('https://haleon.com/')">
+                  <span>🔗</span> Register
+                </button>
+                <button class="btn-secondary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="addToCalendar('Annual Haleon Symposium 2026', 'Healthcare Partners Symposium', 'Grand Nile Tower, Cairo', '2026-10-15T10:00:00', '2026-10-15T17:00:00')">
+                  <span>📅</span> Add to Calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. PRODUCT LAUNCHES ACCORDION -->
+        <div class="accordion-card" id="cal-sec-launches">
+          <div class="accordion-header" onclick="toggleAccordion('cal-sec-launches')">
+            <div class="accordion-icon-title">
+              <span style="font-size: 1.2rem;">🚀</span>
+              <span>Product Launches</span>
+            </div>
+            <div class="accordion-arrow">▼</div>
+          </div>
+          <div class="accordion-content">
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: #fff;">Centrum Energy & Immunity Innovation
+                Launch 2026</div>
+              <div style="font-size: 0.82rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px;">
+                <div>📅 <strong>Time:</strong> Monday, November 9, 2026 • 8:00 PM (EGT)</div>
+                <div>📍 <strong>Location:</strong> Live Digital Broadcast</div>
+                <div style="margin-top: 4px; line-height: 1.4; color: #a1b0c0;">Exclusive unveiling of next-generation
+                  multivitamin formulations engineered for daily active wellness.</div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button class="btn-primary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="registerEvent('https://haleon.com/')">
+                  <span>🔗</span> Register
+                </button>
+                <button class="btn-secondary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="addToCalendar('Centrum Innovation Launch', 'Centrum Energy & Immunity Launch', 'Live Digital Broadcast', '2026-11-09T20:00:00', '2026-11-09T21:30:00')">
+                  <span>📅</span> Add to Calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. LIVE Q&A SESSIONS ACCORDION -->
+        <div class="accordion-card" id="cal-sec-qna">
+          <div class="accordion-header" onclick="toggleAccordion('cal-sec-qna')">
+            <div class="accordion-icon-title">
+              <span style="font-size: 1.2rem;">💬</span>
+              <span>Live Q&A Sessions</span>
+            </div>
+            <div class="accordion-arrow">▼</div>
+          </div>
+          <div class="accordion-content">
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-weight: 700; font-size: 0.95rem; color: #fff;">Ask the Expert: Gum Health & Sensitivity
+                Q&A</div>
+              <div style="font-size: 0.82rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px;">
+                <div>📅 <strong>Time:</strong> Thursday, December 3, 2026 • 6:30 PM (EGT)</div>
+                <div>📍 <strong>Location:</strong> Haleon Partners Portal Live Stream</div>
+                <div style="margin-top: 4px; line-height: 1.4; color: #a1b0c0;">Live interactive Q&A session with key
+                  opinion leaders answering your pharmacy practice questions.</div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 8px;">
+                <button class="btn-primary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="registerEvent('https://haleon.com/')">
+                  <span>🔗</span> Register
+                </button>
+                <button class="btn-secondary"
+                  style="flex: 1; padding: 10px 12px; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px;"
+                  onclick="addToCalendar('Ask the Expert Q&A', 'Gum Health & Sensitivity Live Q&A', 'Haleon Partners Portal', '2026-12-03T18:30:00', '2026-12-03T19:30:00')">
+                  <span>📅</span> Add to Calendar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="view rewards-view" id="view-scanner" style="padding: 20px;">
+      <div class="page-title">Collect Points</div>
+      <div class="page-sub" style="margin-bottom: 20px;">Scan QR codes from Physical Game Stations</div>
+
+      <div
+        style="background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 22px; text-align: center;">
+        <div class="status-pill" id="scan-status-pill"
+          style="display:inline-flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:0.84rem; color:var(--muted); margin-bottom:12px;">
+          <div class="status-dot" style="width:8px; height:8px; border-radius:50%; background:var(--muted);"></div>
+          <span id="scan-status-text">Camera not started</span>
+        </div>
+
+        <div id="scan-video-wrap"
+          style="width: 100%; aspect-ratio: 1/1; border-radius: 14px; overflow: hidden; background: #000; position: relative; display: none; margin-bottom: 14px;">
+          <video id="scan-video" playsinline autoplay muted
+            style="width: 100%; height: 100%; object-fit: cover;"></video>
+        </div>
+
+        <button class="btn-primary" id="btn-start-scan" onclick="startPointScanner()">📷 Start Camera</button>
+        <button class="btn-secondary" id="btn-stop-scan" style="display: none; margin-top:10px;"
+          onclick="stopPointScanner()">✕ Stop Camera</button>
+      </div>
+    </div>
+
+    <div class="view rewards-view" id="view-rewards">
+      <div class="rewards-header">
+        <div class="page-title">Rewards</div>
+        <div class="page-sub">Redeem your points for exclusive perks</div>
+        <div class="rewards-pts-bar" style="margin-bottom: 20px;">
+          <span class="rewards-pts-label">Your Points</span>
+          <span class="rewards-pts-val" id="rewards-pts-display">0 pts</span>
+        </div>
+        <div id="rewards-note-container"></div>
+      </div>
+      <div class="rewards-grid" id="rewards-full-grid" style="padding:16px;"></div>
+    </div>
+
+    <div class="view profile-view" id="view-profile">
+      <div class="page-title">Membership</div>
+      <div class="page-sub" style="margin-bottom:20px">Tap card to flip</div>
+
+      <!-- DIGITAL MEMBERSHIP CARD (PRESERVED) -->
+      <div class="card-scene" onclick="flipCard()" tabindex="-1">
+        <div class="card-inner" id="card-inner">
+          <div class="card-face" id="card-face-front">
+            <img class="card-png-fill" src="assets/Card-Face.png" alt="Membership Card Front" />
+          </div>
+          <div class="card-face card-back-face" id="card-face-back">
+            <img class="card-png-fill" src="assets/Card-Back.png" alt="Membership Card Back" />
+            <div class="cb-qr-overlay">
+              <div class="cb-qr">
+                <img id="card-qr-img" src="" alt="Member QR Code" />
+              </div>
+            </div>
+            <div class="cb-name-overlay">
+              <span id="card-name-back">User Name</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMMENTED OUT UNUSED PROFILE STATS, BADGES, AND PHYSICAL CARD LINK PER REQUEST -->
+      <!--
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="stat-val" id="stat-pts">0</div>
+          <div class="stat-lbl">Points</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val" id="stat-quizzes">0</div>
+          <div class="stat-lbl">Games Done</div>
+        </div>
+      </div>
+
+      <div class="profile-section" id="profile-banner-card" style="display: none; margin-bottom: 24px;">
+        <div class="registration-reminder" onclick="openCardLinkDialog()">
+          Link Your Physical Card
+        </div>
+      </div>
+
+      <div class="profile-section">
+        <div class="section-title">Badges Collected</div>
+        <div class="profile-badges-row" id="profile-badges">
+          <div class="profile-badge-empty">No badges claimed yet.</div>
+        </div>
+      </div>
+      -->
+
+      <!-- TIER PROGRESS CARD WIDGET -->
+      <div class="tier-card-widget" id="tier-card-profile">
+        <div class="tier-card-header">
+          <div class="tier-card-name"><span id="tc-name-profile">No Tier</span></div>
+          <div class="tier-card-pts"><span id="tc-pts-profile">0</span> pts</div>
+        </div>
+        <div class="tier-card-bar-bg">
+          <div class="tier-card-bar-fill" id="tc-fill-profile" style="width: 0%;"></div>
+        </div>
+        <div class="tier-card-footer">
+          <span id="tc-next-profile">500 pts to Bronze tier</span>
+        </div>
+      </div>
+
+      <!-- COMPACT ACCORDION CARDS -->
+
+      <!-- 1. PERSONAL INFO ACCORDION -->
+      <div class="accordion-card" id="acc-personal">
+        <div class="accordion-header" onclick="toggleAccordion('acc-personal')">
+          <div class="accordion-icon-title">
+            <span style="font-size: 1.2rem;">👤</span>
+            <span>Personal Info</span>
+          </div>
+          <div class="accordion-arrow">▼</div>
+        </div>
+        <div class="accordion-content">
+          <div class="profile-info-box" style="margin-top: 10px;">
+            <div class="info-row"><span>First Name</span><strong id="info-fname">—</strong></div>
+            <div class="info-row"><span>Last Name</span><strong id="info-lname">—</strong></div>
+            <div class="info-row"><span>Email</span><strong id="info-email">—</strong></div>
+            <div class="info-row"><span>Phone</span><strong id="info-phone">—</strong></div>
+            <div class="info-row"><span>Pharmacy</span><strong id="info-pharmacy">—</strong></div>
+            <div class="info-row"><span>City</span><strong id="info-city">—</strong></div>
+            <div class="info-row"><span>Profession</span><strong id="info-profession">—</strong></div>
+            <div class="info-row" id="card-id-row"><span>Card ID</span><strong id="info-card-id">—</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. MY LEARNING ACCORDION -->
+      <div class="accordion-card" id="acc-learning">
+        <div class="accordion-header" onclick="toggleAccordion('acc-learning')">
+          <div class="accordion-icon-title">
+            <span style="font-size: 1.2rem;">📚</span>
+            <span>My Learning</span>
+          </div>
+          <div class="accordion-arrow">▼</div>
+        </div>
+        <div class="accordion-content">
+          <div id="my-learning-container">
+            <div style="color: var(--muted); font-size: 0.88rem; text-align: center; padding: 16px 0;">No learning
+              records yet</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. MY POINTS ACCORDION -->
+      <div class="accordion-card" id="acc-points">
+        <div class="accordion-header" onclick="toggleAccordion('acc-points')">
+          <div class="accordion-icon-title">
+            <span style="font-size: 1.2rem;">📊</span>
+            <span>My Points</span>
+          </div>
+          <div class="accordion-arrow">▼</div>
+        </div>
+        <div class="accordion-content">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px;">
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--muted); font-weight: 600; text-transform: uppercase;">Current
+                Tier</div>
+              <div style="font-size: 1rem; font-weight: 800; color: #fff; margin-top: 4px;" id="profile-tier-name">
+                No Tier</div>
+            </div>
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--muted); font-weight: 600; text-transform: uppercase;">Total
+                Points</div>
+              <div style="font-size: 1rem; font-weight: 800; color: var(--green); margin-top: 4px;"
+                id="profile-pts-val">0 pts</div>
+            </div>
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 8px; text-align: center;">
+              <div style="font-size: 0.68rem; color: var(--muted); font-weight: 600; text-transform: uppercase;">Monthly
+                Points</div>
+              <div style="font-size: 1rem; font-weight: 800; color: #60a5fa; margin-top: 4px;" id="profile-monthly-pts">
+                0 pts</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. LEADERBOARDS ACCORDION -->
+      <div class="accordion-card" id="acc-leaderboards">
+        <div class="accordion-header" onclick="toggleAccordion('acc-leaderboards')">
+          <div class="accordion-icon-title">
+            <span style="font-size: 1.2rem;">🏆</span>
+            <span>Leaderboards</span>
+          </div>
+          <div class="accordion-arrow">▼</div>
+        </div>
+        <div class="accordion-content">
+          <div id="leaderboard-list-container"
+            style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+            <div style="color: var(--muted); font-size: 0.85rem; text-align: center; padding: 10px;">Loading
+              leaderboard...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. REWARDS & TIERS ACCORDION -->
+      <div class="accordion-card" id="acc-rewards">
+        <div class="accordion-header" onclick="toggleAccordion('acc-rewards')">
+          <div class="accordion-icon-title">
+            <span style="font-size: 1.2rem;">🎁</span>
+            <span>Tiers</span>
+          </div>
+          <div class="accordion-arrow">▼</div>
+        </div>
+        <div class="accordion-content">
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: #a0a0a0; margin-bottom: 4px;">⚪ No Tier (0 - 500 pts)</div>
+              <ul style="font-size: 0.8rem; color: var(--muted); padding-left: 18px; line-height: 1.5;">
+                <li>Earn 500 pts to reach Bronze Tier</li>
+              </ul>
+            </div>
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: #cd7f32; margin-bottom: 4px;">🥉 Bronze Tier (500 - 1000 pts)</div>
+              <ul style="font-size: 0.8rem; color: var(--muted); padding-left: 18px; line-height: 1.5;">
+                <li>Bronze Giveaways: Pen - Notebook - Tote Bag</li>
+              </ul>
+            </div>
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: #c0c0c0; margin-bottom: 4px;">🥈 Silver Tier (1000 - 1500 pts)</div>
+              <ul style="font-size: 0.8rem; color: var(--muted); padding-left: 18px; line-height: 1.5;">
+                <li>Silver Giveaways: Mug - Desk Calendar - Flask</li>
+              </ul>
+            </div>
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: #ffd700; margin-bottom: 4px;">🥇 Gold Tier (1500 - 2000 pts)</div>
+              <ul style="font-size: 0.8rem; color: var(--muted); padding-left: 18px; line-height: 1.5;">
+                <li>Mug, Desk Calendar, Flask + 2 Samples of Haleon products</li>
+              </ul>
+            </div>
+            <div
+              style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;">
+              <div style="font-weight: 700; color: #e5e4e2; margin-bottom: 4px;">💎 Platinum Tier (2000+ pts)</div>
+              <ul style="font-size: 0.8rem; color: var(--muted); padding-left: 18px; line-height: 1.5;">
+                <li>Mug, Desk Calendar, Flask + 5 Samples of Haleon products</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. GIVEAWAYS ACCORDION -->
+      <div class="accordion-card" id="acc-giveaways">
+        <div class="accordion-header" onclick="toggleAccordion('acc-giveaways')">
+          <div class="accordion-icon-title">
+            <span style="font-size: 1.2rem;">🛍️</span>
+            <span>Rewards</span>
+          </div>
+          <div class="accordion-arrow">▼</div>
+        </div>
+        <div class="accordion-content">
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 10px;">
+            <!-- 1. Pen (Bronze, 100 pts) -->
+            <div class="giveaway-card" id="gw-card-pen" data-target="100">
+              <div class="giveaway-lock-overlay" id="gw-lock-pen">
+                <div class="giveaway-lock-ring-wrap">
+                  <svg viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" />
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="#2ee701" stroke-width="3.5"
+                      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" id="gw-ring-pen" />
+                  </svg>
+                  <img src="assets/Lock.png" alt="Locked" class="giveaway-lock-icon">
+                </div>
+                <div class="giveaway-lock-text"><span id="gw-pts-left-pen">100</span> pts left</div>
+              </div>
+              <img src="assets/Pen.png" alt="Executive Pen" class="giveaway-img">
+              <div class="giveaway-title">Executive Pen</div>
+              <div class="giveaway-pts">100 pts</div>
+            </div>
+
+            <!-- 2. Notebook (Bronze, 200 pts) -->
+            <div class="giveaway-card" id="gw-card-notebook" data-target="200">
+              <div class="giveaway-lock-overlay" id="gw-lock-notebook">
+                <div class="giveaway-lock-ring-wrap">
+                  <svg viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" />
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="#2ee701" stroke-width="3.5"
+                      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" id="gw-ring-notebook" />
+                  </svg>
+                  <img src="assets/Lock.png" alt="Locked" class="giveaway-lock-icon">
+                </div>
+                <div class="giveaway-lock-text"><span id="gw-pts-left-notebook">200</span> pts left</div>
+              </div>
+              <img src="assets/Notebook.png" alt="Partner Notebook" class="giveaway-img">
+              <div class="giveaway-title">Notebook</div>
+              <div class="giveaway-pts">200 pts</div>
+            </div>
+
+            <!-- 3. Tote Bag (Bronze, 300 pts) -->
+            <div class="giveaway-card" id="gw-card-tote" data-target="300">
+              <div class="giveaway-lock-overlay" id="gw-lock-tote">
+                <div class="giveaway-lock-ring-wrap">
+                  <svg viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" />
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="#2ee701" stroke-width="3.5"
+                      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" id="gw-ring-tote" />
+                  </svg>
+                  <img src="assets/Lock.png" alt="Locked" class="giveaway-lock-icon">
+                </div>
+                <div class="giveaway-lock-text"><span id="gw-pts-left-tote">300</span> pts left</div>
+              </div>
+              <img src="assets/Tote_Bag.png" onerror="this.src='assets/Build Basket.png'" alt="Tote Bag"
+                class="giveaway-img">
+              <div class="giveaway-title">Tote Bag</div>
+              <div class="giveaway-pts">300 pts</div>
+            </div>
+
+            <!-- 4. Desk Calendar (Silver, 400 pts) -->
+            <div class="giveaway-card" id="gw-card-calendar" data-target="400">
+              <div class="giveaway-lock-overlay" id="gw-lock-calendar">
+                <div class="giveaway-lock-ring-wrap">
+                  <svg viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" />
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="#2ee701" stroke-width="3.5"
+                      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" id="gw-ring-calendar" />
+                  </svg>
+                  <img src="assets/Lock.png" alt="Locked" class="giveaway-lock-icon">
+                </div>
+                <div class="giveaway-lock-text"><span id="gw-pts-left-calendar">400</span> pts left</div>
+              </div>
+              <img src="assets/Desk_Calendar.png" onerror="this.src='assets/Card-Face.png'" alt="Desk Calendar"
+                class="giveaway-img">
+              <div class="giveaway-title">Desk Calendar</div>
+              <div class="giveaway-pts">400 pts</div>
+            </div>
+
+            <!-- 5. Mug (Silver, 500 pts) -->
+            <div class="giveaway-card" id="gw-card-mug" data-target="500">
+              <div class="giveaway-lock-overlay" id="gw-lock-mug">
+                <div class="giveaway-lock-ring-wrap">
+                  <svg viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" />
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="#2ee701" stroke-width="3.5"
+                      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" id="gw-ring-mug" />
+                  </svg>
+                  <img src="assets/Lock.png" alt="Locked" class="giveaway-lock-icon">
+                </div>
+                <div class="giveaway-lock-text"><span id="gw-pts-left-mug">500</span> pts left</div>
+              </div>
+              <img src="assets/Mug.png" alt="Ceramic Mug" class="giveaway-img">
+              <div class="giveaway-title">Ceramic Mug</div>
+              <div class="giveaway-pts">500 pts</div>
+            </div>
+
+            <!-- 6. Flask (Silver, 750 pts) -->
+            <div class="giveaway-card" id="gw-card-flask" data-target="750">
+              <div class="giveaway-lock-overlay" id="gw-lock-flask">
+                <div class="giveaway-lock-ring-wrap">
+                  <svg viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="3.5" />
+                    <circle cx="26" cy="26" r="22" fill="none" stroke="#2ee701" stroke-width="3.5"
+                      stroke-dasharray="138.2" stroke-dashoffset="138.2" stroke-linecap="round" id="gw-ring-flask" />
+                  </svg>
+                  <img src="assets/Lock.png" alt="Locked" class="giveaway-lock-icon">
+                </div>
+                <div class="giveaway-lock-text"><span id="gw-pts-left-flask">750</span> pts left</div>
+              </div>
+              <img src="assets/Flask.png" alt="Stainless Flask" class="giveaway-img">
+              <div class="giveaway-title">Stainless Flask</div>
+              <div class="giveaway-pts">750 pts</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sync-status" id="sync-status"></div>
+    </div>
+
+    <nav class="bottom-nav" id="bottom-nav">
+
+      <div class="scroll-indicator" id="scroll-indicator">
+        <span>Swipe down for more</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-home" onclick="switchTab('home')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+          Home
+        </button>
+
+        <button class="nav-tab" id="tab-education" onclick="switchTab('education')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 14l9-5-9-5-9 5 9 5z" />
+            <path
+              d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+          </svg>
+          Education
+        </button>
+
+        <button class="nav-tab" id="tab-games" onclick="switchTab('games')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="2" />
+            <path d="M6 12h4m-2-2v4m10-2h.01m-3 0h.01" />
+          </svg>
+          Games
+        </button>
+
+        <button class="nav-tab" id="tab-calendar" onclick="switchTab('calendar')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          Calendar
+        </button>
+
+        <button class="nav-tab" id="tab-profile" onclick="switchTab('profile')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          Profile
+        </button>
+
+        <!-- COMMENTED OUT REPLACED TABS TO PRESERVE CODE SNAPSHOTS -->
+        <!--
+      <button class="nav-tab" id="tab-rewards" onclick="switchTab('rewards')">Rewards</button>
+      <button class="nav-tab" id="tab-scanner" onclick="switchTab('scanner')">Scan</button>
+      -->
+      </div>
+    </nav>
+
+    <div class="global-footer">
+      <img src="assets/Footer.png" alt="Haleon Footer">
+    </div>
+
+    <!--
+<div class="dialog-overlay" id="image-promo-dialog">
+  <div class="dialog-box"
+    style="position:relative; padding:0; background:transparent; border:none; max-width:420px; width:92%; margin:auto;">
+    <span onclick="document.getElementById('image-promo-dialog').classList.remove('open')"
+      style="position:absolute; top:12px; right:18px; color:#ffffff; font-size:2.2rem; font-weight:bold; cursor:pointer; z-index:101; text-shadow: 0 2px 8px rgba(0,0,0,0.8); line-height: 1;">
+      &times;
+    </span>
+    <a href="https://www.haleonhealthpartner.com/en-eg/news-events/events-and-webinars/haleon-partners-club-beyond-the-counter/"
+      target="_blank" onclick="trackWebinarClick('popup')"
+      style="display:block; overflow:hidden; border-radius:16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+      <img src="assets/webinar2.png" alt="Haleon Partners Club Webinar" style="width:100%; height:auto; display:block;">
+    </a>
+  </div>
+</div>
+-->
+
+    <div class="dialog-overlay" id="welcome-dialog">
+      <div class="dialog-box" style="position:relative;overflow:hidden;">
+        <div class="dialog-icon">🎉</div>
+        <div class="dialog-title" style="font-size:1.4rem;">Welcome to<br>Haleon Partners Club!</div>
+        <div class="dialog-msg" id="welcome-name" style="margin:10px 0 4px;font-size:1.1rem;"></div>
+        <div class="dialog-sub" id="welcome-email" style="margin-bottom:14px;word-break:break-all;"></div>
+        <button class="btn-primary" onclick="closeWelcomeDialog()">Let's Get Started 🚀</button>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="badge-dialog" onclick="closeBadgeDialog()">
+      <div class="dialog-box" onclick="event.stopPropagation()">
+        <div class="dialog-icon" id="badge-dialog-icon">
+          <img src="assets/Health Advocate.png" alt="Badge" style="width: 60px; height: 60px; object-fit: contain;">
+        </div>
+        <div class="dialog-title">Badge Claimed! 🎉</div>
+        <div class="dialog-msg" id="badge-dialog-name">Health Advocate</div>
+        <div class="dialog-sub">You've earned this badge. Congrats!</div>
+        <button class="btn-primary" style="margin-top:16px" onclick="closeBadgeDialog()">Awesome!</button>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="qr-dialog">
+      <div class="dialog-box">
+        <div class="dialog-title" id="qr-dialog-title">Redeem Reward</div>
+        <div class="qr-dialog-code">
+          <img id="qr-dialog-img" src="" alt="QR Code"
+            style="width:188px;height:188px;border-radius:8px;display:block;" />
+        </div>
+        <div class="qr-countdown">Scan within <span id="qr-timer">60</span>s</div>
+        <div class="dialog-sub">Show this QR to the usher to claim your reward</div>
+        <button class="btn-secondary" style="margin-top:12px" onclick="closeQRDialog()">Cancel</button>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="redeem-success-dialog">
+      <div class="dialog-box"
+        style="background:linear-gradient(160deg,var(--surface) 0%,#0d1a12 100%);border-color:rgba(74,222,128,0.35);">
+        <div class="dialog-icon">🎁</div>
+        <div class="dialog-title" style="color:var(--green)">Reward Redeemed!</div>
+        <div class="dialog-msg" id="redeem-success-reward">—</div>
+        <div class="dialog-sub" id="redeem-success-pts">—</div>
+        <button class="btn-primary" style="margin-top:16px" onclick="closeRedeemSuccessDialog()">Great! 🎉</button>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="replay-dialog">
+      <div class="dialog-box">
+        <div class="dialog-icon" id="replay-dialog-icon" style="margin-bottom:10px;">
+          <img src="assets/logo1.png" alt="Game" style="width: 80px; height: 80px; object-fit: contain;">
+        </div>
+        <div class="dialog-title" id="replay-dialog-name">Game Name</div>
+        <div class="dialog-sub" id="replay-dialog-pts"
+          style="margin-bottom:20px; font-weight:bold; color:var(--green); font-size:1.1rem;">Points collected</div>
+        <button class="btn-primary" id="replay-dialog-play-btn" style="margin-bottom: 10px;">Play Again</button>
+        <button class="btn-secondary"
+          onclick="document.getElementById('replay-dialog').classList.remove('open')">Close</button>
+      </div>
+    </div>
+
+    <!-- QUIZ COMPLETED DIALOG -->
+    <div class="dialog-overlay" id="quiz-completed-dialog">
+      <div class="dialog-box"
+        style="background:linear-gradient(160deg,var(--surface) 0%,#0d1a2e 100%);border-color:rgba(74,222,128,0.4);">
+        <div class="dialog-icon" style="font-size:3rem; margin-bottom:10px;">🏆</div>
+        <div class="dialog-title" style="color:var(--green)">Quiz Completed!</div>
+        <div class="dialog-msg" id="quiz-dialog-pts"
+          style="margin:10px 0 6px; font-size:1.15rem; font-weight:700; color:#fff;">
+          Points Earned: +50 Points!
+        </div>
+        <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; line-height:1.5;">
+          Stay tuned for the next quiz! 🚀
+        </p>
+        <button class="btn-primary" onclick="closeQuizCompletedDialog()">Awesome! 🎉</button>
+      </div>
+    </div>
+
+    <!-- WEBINAR IN-PLATFORM VIDEO PLAYER MODAL -->
+    <div class="dialog-overlay" id="webinar-player-modal" style="display: none; z-index: 9999;">
+      <div class="dialog-card"
+        style="max-width: 640px; width: 92%; padding: 18px; border-radius: 20px; background: linear-gradient(160deg, var(--surface) 0%, #0d1a2e 100%); border: 1px solid rgba(96, 165, 250, 0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 id="modal-webinar-title"
+            style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0; line-height: 1.3;">Webinar Video</h3>
+          <button
+            style="background: rgba(255,255,255,0.08); border: none; color: var(--muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+            onclick="closeWebinarPlayerModal()">✕</button>
+        </div>
+
+        <!-- Video Player Iframe Container -->
+        <div
+          style="width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; position: relative; margin-bottom: 14px; border: 1px solid var(--border);">
+          <iframe id="modal-webinar-iframe" src="" style="width: 100%; height: 100%; border: none;"
+            allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>
+        </div>
+
+        <!-- Webinar Metadata Tags -->
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;" id="modal-webinar-tags">
+          <!-- Dynamically populated -->
+        </div>
+
+        <button class="btn-primary" style="padding: 12px; font-size: 0.9rem;" onclick="closeWebinarPlayerModal()">Close
+          Player</button>
+      </div>
+    </div>
+
+    <!-- HORIZONTAL LANDSCAPE FULLSCREEN WEBINAR OVERLAY -->
+    <div class="landscape-video-overlay" id="webinar-landscape-overlay" style="display: none;">
+      <button class="landscape-overlay-close-btn" onclick="closeLandscapeOverlay()">✕ Exit Fullscreen</button>
+      <iframe id="landscape-overlay-iframe" src="" allow="autoplay; encrypted-media; fullscreen"
+        allowfullscreen></iframe>
+    </div>
+
+    <!-- DOCUMENT VIEWER MODAL (IN-APP DOCUMENT VIEWING) -->
+    <div class="dialog-overlay" id="document-viewer-modal" style="display: none; z-index: 99999;">
+      <div class="dialog-card"
+        style="max-width: 800px; width: 95%; height: 85vh; padding: 18px; border-radius: 20px; background: linear-gradient(160deg, var(--surface) 0%, #0d1a2e 100%); border: 1px solid rgba(96, 165, 250, 0.4); display: flex; flex-direction: column;">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-shrink: 0;">
+          <h3 id="doc-viewer-title"
+            style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;">
+            Document Viewer</h3>
+          <button
+            style="background: rgba(255,255,255,0.08); border: none; color: var(--muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+            onclick="closeDocumentViewerModal()">✕</button>
+        </div>
+
+        <!-- Document Iframe Viewer -->
+        <div
+          style="flex: 1; width: 100%; border-radius: 12px; overflow: hidden; background: #fff; position: relative; border: 1px solid var(--border); margin-bottom: 12px;">
+          <iframe id="doc-viewer-iframe" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-shrink: 0;">
+          <a id="doc-viewer-download-btn" href="" download class="btn-primary"
+            style="flex: 1; padding: 10px; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;"
+            onclick="showToast('Downloading presentation...')">
+            <span>📥</span> Download Document
+          </a>
+          <button class="btn-secondary" style="flex: 1; padding: 10px; font-size: 0.85rem;"
+            onclick="closeDocumentViewerModal()">Close Viewer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BRAND VIDEO PLAYER MODAL -->
+    <div class="dialog-overlay" id="brand-video-player-modal" style="display: none; z-index: 999999;">
+      <div class="dialog-card"
+        style="max-width: 680px; width: 94%; padding: 18px; border-radius: 20px; background: linear-gradient(160deg, var(--surface) 0%, #0d1a2e 100%); border: 1px solid rgba(74, 222, 128, 0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 id="brand-video-modal-title"
+            style="font-size: 1.05rem; font-weight: 700; color: #fff; margin: 0; line-height: 1.3;">Brand Video</h3>
+          <button
+            style="background: rgba(255,255,255,0.08); border: none; color: var(--muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+            onclick="closeBrandVideoPlayerModal()">✕</button>
+        </div>
+
+        <!-- Video Player Box -->
+        <div
+          style="width: 100%; border-radius: 14px; overflow: hidden; background: #000; position: relative; margin-bottom: 14px; border: 1px solid var(--border);">
+          <video id="brand-video-element" controls playsinline
+            style="width: 100%; max-height: 70vh; object-fit: contain; display: block;"></video>
+        </div>
+
+        <button class="btn-primary" style="padding: 12px; font-size: 0.9rem;"
+          onclick="closeBrandVideoPlayerModal()">Close Video</button>
+      </div>
+    </div>
+
+    <!-- MYSTERY SHOPPER QUESTION MODAL -->
+    <div class="dialog-overlay" id="mystery-shopper-question-modal" style="display: none; z-index: 999999;">
+      <div class="dialog-card"
+        style="max-width: 520px; width: 92%; padding: 22px; border-radius: 24px; background: linear-gradient(160deg, #1e1b4b 0%, #0d1a2e 100%); border: 1px solid rgba(129, 140, 248, 0.5); box-shadow: 0 10px 40px rgba(0,0,0,0.5);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.6rem;">🕵️‍♂️</span>
+            <h3 style="font-size: 1.15rem; font-weight: 700; color: #fff; margin: 0;">Mystery Shopper Question</h3>
+          </div>
+          <button
+            style="background: rgba(255,255,255,0.08); border: none; color: var(--muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+            onclick="closeMysteryShopperQuestionModal()">✕</button>
+        </div>
+
+        <p style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 18px; line-height: 1.4;">
+          Answer this question based on the Mystery Shopper videos to unlock the <strong>Spin to Win</strong> game!
+        </p>
+
+        <div
+          style="background: rgba(255,255,255,0.04); border: 1px solid rgba(129, 140, 248, 0.2); border-radius: 14px; padding: 16px; margin-bottom: 18px;">
+          <div style="font-size: 0.95rem; font-weight: 600; color: #fff; line-height: 1.4; margin-bottom: 14px;">
+            ❓ What key advantage of Panadol is demonstrated in the dissolution test videos?
+          </div>
+
+          <div class="mystery-options-list" style="display: flex; flex-direction: column; gap: 10px;">
+            <button class="mystery-option-btn" onclick="selectMysteryOption(0)">
+              <span class="option-prefix">A</span>
+              <span>Fast dissolution for rapid pain relief action</span>
+            </button>
+            <button class="mystery-option-btn" onclick="selectMysteryOption(1)">
+              <span class="option-prefix">B</span>
+              <span>Delayed release formulation lasting 24 hours</span>
+            </button>
+            <button class="mystery-option-btn" onclick="selectMysteryOption(2)">
+              <span class="option-prefix">C</span>
+              <span>Color changing technology upon contact with water</span>
+            </button>
+            <button class="mystery-option-btn" onclick="selectMysteryOption(3)">
+              <span class="option-prefix">D</span>
+              <span>Chewable tablet format for children</span>
+            </button>
+          </div>
+        </div>
+
+        <button id="mystery-submit-btn" class="btn-primary"
+          style="width: 100%; padding: 14px; font-size: 0.95rem; border-radius: 12px; font-weight: 700; opacity: 0.5; pointer-events: none;"
+          onclick="submitMysteryShopperQuestion()">
+          Submit & Spin Wheel 🎡
+        </button>
+      </div>
+    </div>
+
+    <!-- MYSTERY SHOPPER WHEEL MODAL -->
+    <div class="dialog-overlay" id="mystery-shopper-wheel-modal" style="display: none; z-index: 999999;">
+      <div class="dialog-card"
+        style="max-width: 480px; width: 92%; padding: 22px; border-radius: 24px; background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%); border: 2px solid #818cf8; box-shadow: 0 15px 50px rgba(0,0,0,0.7); text-align: center; position: relative;">
+        <button
+          style="position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.08); border: none; color: var(--muted); border-radius: 50%; width: 32px; height: 32px; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;"
+          onclick="closeMysteryShopperWheelModal()">✕</button>
+
+        <div style="font-size: 2.2rem; margin-bottom: 4px;">🎡</div>
+        <h3 style="font-size: 1.25rem; font-weight: 800; color: #fff; margin-bottom: 4px;">Mystery Shopper Giveaway Wheel</h3>
+        <p style="font-size: 0.85rem; color: #c7d2fe; margin-bottom: 15px;">Spin the wheel to win your exclusive giveaway reward!</p>
+
+        <!-- Wheel Wrapper -->
+        <div class="wheel-wrapper"
+          style="width: 290px; height: 290px; margin: 10px auto 20px; position: relative; border-radius: 50%; border: 6px solid rgba(129, 140, 248, 0.6); box-shadow: 0 0 30px rgba(0,0,0,0.8), 0 0 20px rgba(129, 140, 248, 0.4); overflow: hidden;">
+          <div class="wheel-pointer"
+            style="position: absolute; top: -18px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 36px solid #ef4444; z-index: 10; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));"></div>
+          <div class="center-peg"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; background: #111418; border: 3px solid #818cf8; border-radius: 50%; z-index: 5; box-shadow: 0 2px 8px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">🕵️‍♂️</div>
+          <canvas id="mystery-wheel" width="600" height="600"
+            style="width: 100%; height: 100%; border-radius: 50%; display: block;"></canvas>
+        </div>
+
+        <button id="mystery-spin-btn" class="btn-primary"
+          style="width: 100%; max-width: 260px; padding: 14px; font-size: 1.1rem; border-radius: 30px; font-weight: 800; background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border: none; box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4); cursor: pointer; transition: all 0.2s;"
+          onclick="spinMysteryWheel()">SPIN NOW! 🎡</button>
+      </div>
+    </div>
+
+    <!-- MYSTERY SHOPPER REWARD MODAL -->
+    <div class="dialog-overlay" id="mystery-shopper-reward-modal" style="display: none; z-index: 999999;">
+      <div class="dialog-card"
+        style="max-width: 440px; width: 92%; padding: 26px 22px; border-radius: 24px; background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 100%); border: 2px solid #4ade80; box-shadow: 0 15px 50px rgba(0,0,0,0.8); text-align: center; position: relative;">
+        <div style="font-size: 3.5rem; margin-bottom: 10px;">🎉</div>
+        <h3 style="font-size: 1.5rem; font-weight: 800; color: #4ade80; margin-bottom: 6px;">Congratulations!</h3>
+        <p style="font-size: 0.95rem; color: #ffffff; font-weight: 600; margin-bottom: 16px;">Congrats you won this item</p>
+
+        <div
+          style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(74, 222, 128, 0.3); border-radius: 18px; padding: 20px; margin-bottom: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <img id="mystery-reward-img" src="" alt="Won Item"
+            style="max-width: 150px; max-height: 150px; object-fit: contain; filter: drop-shadow(0 6px 15px rgba(0,0,0,0.4)); margin-bottom: 12px;">
+          <div id="mystery-reward-title"
+            style="font-size: 1.2rem; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;"></div>
+        </div>
+
+        <button class="btn-primary"
+          style="width: 100%; padding: 14px; font-size: 1.05rem; border-radius: 30px; font-weight: 800; background: #4ade80; color: #000; border: none; box-shadow: 0 6px 20px rgba(74, 222, 128, 0.4); cursor: pointer;"
+          onclick="completeMysteryShopperChallenge()">Complete</button>
+      </div>
+    </div>
+
+    <div class="dialog-overlay" id="card-link-dialog">
+      <div class="dialog-box"
+        style="background:linear-gradient(160deg,var(--surface) 0%,#0d1a2e 100%);border-color:rgba(96, 165, 250, 0.4);">
+
+        <div id="card-link-step-scan">
+          <div class="dialog-icon" style="margin-bottom: 4px;">
+            <img src="assets/Scanner.png" alt="Scan" style="width: 180px; object-fit: contain;">
+          </div>
+          <div class="dialog-title" style="font-size:1.2rem;">Link Your Card</div>
+          <div class="dialog-sub" style="margin-bottom:20px;">Scan the QR code on your physical card to link it to your
+            account.</div>
+
+          <div id="dialog-video-wrap"
+            style="width: 100%; aspect-ratio: 1/1; border-radius: 14px; overflow: hidden; background: #000; position: relative; display: none; margin-bottom: 14px;">
+            <video id="dialog-scan-video" playsinline autoplay muted
+              style="width: 100%; height: 100%; object-fit: cover;"></video>
+          </div>
+
+          <button class="btn-primary" id="btn-dialog-scan" onclick="startDialogScanner()">📷 Scan Now</button>
+          <button class="btn-secondary" id="btn-dialog-cancel" style="margin-top:10px"
+            onclick="closeCardLinkDialog()">Close</button>
+        </div>
+
+        <div id="card-link-step-success" style="display: none;">
+          <div class="dialog-icon" style="font-size:2.5rem;">✅</div>
+          <div class="dialog-title" style="color:var(--green)">Card Linked!</div>
+          <div class="dialog-sub" style="margin-bottom:20px;">Your card has been connected successfully.</div>
+          <button class="btn-primary" onclick="finishCardLinking()">Great! 🎉</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+  <script src="app.js"></script>
+
+  <script>
+    // Automatically fade out the scroll indicator when the user scrolls down
+    document.addEventListener('DOMContentLoaded', () => {
+      const indicator = document.getElementById('scroll-indicator');
+      if (!indicator) return;
+
+      // Listen to scroll events on all `.view` elements
+      document.querySelectorAll('.view').forEach(view => {
+        view.addEventListener('scroll', (e) => {
+          if (e.target.scrollTop > 30) {
+            indicator.style.opacity = '0';
+          } else {
+            indicator.style.opacity = '1';
+          }
+        });
+      });
+    });
+  </script>
+</body>
+
+</html>

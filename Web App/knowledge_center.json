@@ -1,0 +1,41 @@
+{
+  "Centrum": {
+    "brandName": "Centrum",
+    "logo": "assets/Centrum_logo.png",
+    "description": "Educational & promotional videos for Centrum multivitamins",
+    "videos": [
+      { "id": "cen-1", "title": "AWA 15 Sec", "url": "assets/Knowledge Center/Centrum/AWA 15SEC_1080x1920.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-2", "title": "AWA 6 Sec", "url": "assets/Knowledge Center/Centrum/AWA 6Sec_1080x1920.mp4", "duration": "6s", "pts": 5 },
+      { "id": "cen-3", "title": "Athlete Campaign", "url": "assets/Knowledge Center/Centrum/Athlete _1080x1920.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-4", "title": "Centrum 15S Male", "url": "assets/Knowledge Center/Centrum/CENTRUM_15S_CON_Male_H.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-5", "title": "Centrum 15S Purchase Male", "url": "assets/Knowledge Center/Centrum/CENTRUM_15S_PUR_Male_H.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-6", "title": "Centrum 15S Awareness", "url": "assets/Knowledge Center/Centrum/CENTRUM_15s_AWA_H.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-7", "title": "Centrum 6S Awareness", "url": "assets/Knowledge Center/Centrum/CENTRUM_6S_AWA_H.mp4", "duration": "6s", "pts": 5 },
+      { "id": "cen-8", "title": "Centrum 6S Male", "url": "assets/Knowledge Center/Centrum/CENTRUM_6S_CON_Male_H.mp4", "duration": "6s", "pts": 5 },
+      { "id": "cen-9", "title": "Centrum 6S Purchase Female", "url": "assets/Knowledge Center/Centrum/CENTRUM_6S_PUR_Female_H.mp4", "duration": "6s", "pts": 5 },
+      { "id": "cen-10", "title": "Centrum 6S Purchase Male", "url": "assets/Knowledge Center/Centrum/CENTRUM_6S_PUR_Male_H.mp4", "duration": "6s", "pts": 5 },
+      { "id": "cen-11", "title": "6 Sec Vertical", "url": "assets/Knowledge Center/Centrum/CON_6SEC_1080x1920.mp4", "duration": "6s", "pts": 5 },
+      { "id": "cen-12", "title": "Exams Campaign", "url": "assets/Knowledge Center/Centrum/Exams_1080x1920.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-13", "title": "Mom Campaign", "url": "assets/Knowledge Center/Centrum/MOM _1080x1920.mp4", "duration": "20s", "pts": 15 },
+      { "id": "cen-14", "title": "Purchase Campaign", "url": "assets/Knowledge Center/Centrum/Purchase_1080x1920.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-15", "title": "Student Campaign", "url": "assets/Knowledge Center/Centrum/Student_1080x1920.mp4", "duration": "15s", "pts": 10 },
+      { "id": "cen-16", "title": "Working Professional", "url": "assets/Knowledge Center/Centrum/Working_1080x1920.mp4", "duration": "20s", "pts": 15 }
+    ]
+  },
+  "Panadol": {
+    "brandName": "Panadol",
+    "logo": "assets/Panadol_logo.png",
+    "description": "Medical & dissolution technology videos for Panadol",
+    "videos": [
+      { "id": "pan-1", "title": "Panadol Dissolution (Arabic)", "url": "assets/Knowledge Center/Panadol/Panadol_Dissolution_Arabic_V6.mp4", "duration": "3 mins", "pts": 10 },
+      { "id": "pan-2", "title": "Panadol Dissolution (English)", "url": "assets/Knowledge Center/Panadol/Panadol_Dissolution_video English.mp4", "duration": "3 mins", "pts": 10 },
+      { "id": "pan-3", "title": "Panadol Extra Optizorb 15SEC", "url": "assets/Knowledge Center/Panadol/Panadol_Extra_Optizorb_15SEC_Rami_Consideration_Horizontal_14.04.2025.mp4", "duration": "15 secs", "pts": 10 }
+    ]
+  },
+  "Sensodyne": {
+    "brandName": "Sensodyne",
+    "logo": "assets/SENSODYNE.png",
+    "description": "Dentine hypersensitivity clinical overview",
+    "videos": []
+  }
+}

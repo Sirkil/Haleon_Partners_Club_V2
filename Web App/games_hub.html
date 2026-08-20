@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Haleon Games Hub</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #000000; 
+      --surface: #0a0a0a; 
+      --border: #333333;
+      --text: #ffffff;
+      --muted: #aaaaaa;
+      --green: #10B981;
+      --blue: #3b82f6;
+      --icon-bg: rgba(255, 255, 255, 0.08);
+      --icon-border: #555555;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 60px;
+    }
+
+    .header {
+      text-align: center;
+      padding: 40px 20px 20px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+      margin-bottom: 40px;
+    }
+
+    .app-logo {
+      max-width: 180px;
+      margin-bottom: 15px;
+    }
+
+    .page-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .page-sub {
+      color: var(--muted);
+      font-size: 1.1rem;
+      font-weight: 400;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    .view {
+      display: none;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    .view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 30px;
+      margin-top: 20px;
+    }
+
+    .category-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease-in-out;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    .category-card.earn:hover {
+      border-color: var(--green);
+      transform: translateY(-5px);
+      box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15);
+    }
+
+    .category-card.learn:hover {
+      border-color: var(--blue);
+      transform: translateY(-5px);
+      box-shadow: 0 12px 24px rgba(59, 130, 246, 0.15);
+    }
+
+    .category-icon {
+      font-size: 3.5rem;
+      margin-bottom: 15px;
+    }
+
+    .category-title {
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .category-desc {
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .back-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 25px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .back-btn:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .section-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 10px;
+      display: inline-block;
+    }
+
+    .section-title.earn-title { border-color: var(--green); }
+    .section-title.learn-title { border-color: var(--blue); }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 20px;
+    }
+
+    .game-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 20px;
+      padding: 24px 15px;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.2s ease-in-out;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+
+    .game-card:hover {
+      transform: translateY(-5px);
+    }
+
+    #view-earn .game-card:hover {
+      border-color: var(--green);
+      box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15);
+    }
+
+    #view-learn .game-card:hover {
+      border-color: var(--blue);
+      box-shadow: 0 12px 24px rgba(59, 130, 246, 0.15);
+    }
+
+    .game-icon-wrap {
+      width: 60px;
+      height: 60px;
+      background: var(--icon-bg);
+      border: 2px solid var(--icon-border);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 15px;
+      transition: all 0.2s ease-in-out;
+    }
+
+    #view-earn .game-card:hover .game-icon-wrap {
+      background: var(--green);
+      border-color: var(--green);
+    }
+
+    #view-learn .game-card:hover .game-icon-wrap {
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .game-icon {
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+      transition: filter 0.2s;
+    }
+
+    .game-card .game-icon {
+      filter: brightness(0) invert(1);
+    }
+
+    .game-title {
+      color: var(--text);
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+
+    .play-badge {
+      background: #222222;
+      color: #ffffff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 50px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+    }
+
+    #view-earn .game-card:hover .play-badge { background: var(--green); color: #ffffff; }
+    #view-learn .game-card:hover .play-badge { background: var(--blue); color: #ffffff; }
+
+    .footer-disclaimer {
+      position: fixed;
+      bottom: 5px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: #666666;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    @media (max-width: 480px) {
+      .games-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+      .page-title { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <img src="assets/logo1.png" alt="Haleon Logo" class="app-logo" onerror="this.style.display='none';">
+    <h1 class="page-title">Games Hub</h1>
+    <p class="page-sub">Select a category to start playing!</p>
+  </header>
+
+  <main class="container">
+    
+    <div id="view-main" class="view active">
+      <div class="category-grid">
+        
+        <div class="category-card earn" onclick="showView('view-earn')">
+          <div class="category-icon">💰</div>
+          <h2 class="category-title">Earn Games</h2>
+          <p class="category-desc">Play to earn points and climb the leaderboard.</p>
+        </div>
+
+        <div class="category-card learn" onclick="showView('view-learn')">
+          <div class="category-icon">🧠</div>
+          <h2 class="category-title">Learn Games</h2>
+          <p class="category-desc">Test your knowledge and learn new facts.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="view-earn" class="view">
+      <button class="back-btn" onclick="showView('view-main')">← Back to Categories</button>
+      <h2 class="section-title earn-title">Earn Games</h2>
+      
+      <div class="games-grid">
+        <a href="game_basket.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Build Basket.png" alt="Build Basket" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Build Basket (V)</div>
+          <div class="play-badge">Play</div>
+        </a>
+
+        <a href="game_placement.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Best Place.png" alt="Best Place" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Perfect Shelf (H)</div>
+          <div class="play-badge">Play</div>
+        </a>
+
+        <a href="game_mitohype.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Panadol Challenge.png" alt="Panadol Challenge" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Fever Smach (H/V)</div>
+          <div class="play-badge">Play</div>
+        </a>
+
+        <a href="game_match.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Matching.png" alt="match Game" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Matching Challenge (V)</div>
+          <div class="play-badge">Play</div>
+        </a>
+
+        <a href="game_word.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/memory game/memoryGameIcon.png" alt="Word Search" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Word Search (V)</div>
+          <div class="play-badge">Play</div>
+        </a>
+      </div>
+    </div>
+
+    <div id="view-learn" class="view">
+      <button class="back-btn" onclick="showView('view-main')">← Back to Categories</button>
+      <h2 class="section-title learn-title">Learn Games</h2>
+      
+      <div class="games-grid">
+        <a href="game_myth.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Myth & Fact.png" alt="Myth vs Fact" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Myth vs Fact (H/V)</div>
+          <div class="play-badge">Play</div>
+        </a>
+
+        <a href="game_buzzer.html?mode=2p" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Buzzer Battle.png" alt="Buzzer Battle" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Buzzer Battle (H)</div>
+          <div class="play-badge">Play</div>
+        </a>
+        
+        <a href="game_spot.html" class="game-card">
+          <div class="game-icon-wrap">
+            <img src="assets/Magnifier.png" alt="Spot The Oppurtuinity" class="game-icon" onerror="this.src='assets/logo1.png'; this.style.opacity='0.5';">
+          </div>
+          <div class="game-title">Spot The Oppurtuinity (H)</div>
+          <div class="play-badge">Play</div>
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <div class="footer-disclaimer">PM-EG-CNT-26-00007</div>
+
+  <script>
+    function showView(viewId) {
+      document.querySelectorAll('.view').forEach(view => {
+        view.classList.remove('active');
+      });
+      document.getElementById(viewId).classList.add('active');
+    }
+  </script>
+
+</body>
+</html>ge

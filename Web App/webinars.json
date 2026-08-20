@@ -1,0 +1,28 @@
+[
+  {
+    "id": "web-101",
+    "title": "Haleon Partners Club - Launch",
+    "speakers": [],
+    "brands": ["Sensodyne", "Panadol", "Centrum"],
+    "specialties": ["Oral Care", "Pain Management"],
+    "hasCertificate": false,
+    "driveUrl": "https://drive.google.com/file/d/1vnIYbJbtn5uU54T3gE6XWLhpX7-gKLEW/preview",
+    "duration": "106 mins",
+    "date": "2026-04-8",
+    "pts": 20,
+    "description": "Launch of Haleon Partners Club"
+  },
+  {
+    "id": "web-102",
+    "title": "Haleon Partners Club Alexandria - Webinar",
+    "speakers": [],
+    "brands": ["Sensodyne", "Panadol", "Centrum"],
+    "specialties": ["Oral Care", "Pain Management"],
+    "hasCertificate": false,
+    "driveUrl": "https://drive.google.com/file/d/1jvh7llpcO5T17V4r9nB6bhQubWD2aLiv/preview",
+    "duration": "103 mins",
+    "date": "2026-07-13",
+    "pts": 15,
+    "description": "Alexandria - Webinar"
+  }
+]

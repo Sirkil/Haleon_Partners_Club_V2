@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Centrum Challenge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #FFFDF8;
+      --text: #333333;
+      --surface: #f9f9f9;
+      --surface2: #ffffff;
+      --border: #eeeeee;
+      --muted: #888888;
+      
+      --c-pink: #E91E63;
+      --c-orange: #FF9800;
+      --c-yellow: #FFC107;
+      --c-green: #4CAF50;
+      --c-blue: #2196F3;
+      --c-purple: #9C27B0;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body { 
+      background: var(--bg); 
+      color: var(--text); 
+      overflow-x: hidden; 
+      touch-action: none;
+    }
+
+    .game-container { 
+      max-width: 800px; 
+      margin: 0 auto; 
+      padding: 20px; 
+      min-height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      position: relative;
+    }
+
+    .game-container-narrow {
+      max-width: 500px;
+    }
+    
+    .auth-title {
+      font-size: 3rem;
+      font-weight: 800;
+      color: #000000;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+
+    .btn-centrum {
+      background: #000000;
+      color: #ffffff;
+      border: none;
+      padding: 15px 30px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+      width: 100%;
+      text-align: center;
+    }
+    .btn-centrum:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 20px rgba(0,0,0,0.2);
+    }
+    .btn-centrum:active:not(:disabled) {
+      transform: translateY(2px);
+    }
+    .btn-centrum:disabled {
+      background: #cccccc;
+      color: #666666;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text);
+      border: 2px solid var(--border);
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .btn-outline:hover {
+      border-color: #000000;
+      color: #000000;
+    }
+
+    .mode-card { 
+      background: var(--surface2); 
+      border: 2px solid var(--border); 
+      border-radius: 24px; 
+      padding: 24px; 
+      margin-bottom: 20px; 
+      text-align: center; 
+      cursor: pointer; 
+      transition: all 0.2s; 
+      box-shadow: 0 10px 20px rgba(0,0,0,0.03);
+      width: 100%;
+    }
+    .mode-card:hover { 
+      border-color: var(--c-orange); 
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+    }
+
+    .iframe-wrap { flex: 1; width: 100%; background: #000; position: relative; overflow: hidden; }
+    .iframe-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; display: block; }
+    
+    .embed-header { 
+      display: grid; 
+      grid-template-columns: 1fr auto 1fr; 
+      align-items: center; 
+      padding: 10px 16px; 
+      background: var(--bg); 
+      border-bottom: 2px solid var(--border); 
+      flex-shrink: 0; 
+      width: 100%;
+      min-height: 65px;
+      gap: 10px;
+    }
+
+    .toast {
+      position: fixed;
+      top: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--text);
+      color: var(--bg);
+      padding: 15px 30px;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 1.1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      z-index: 10000;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;display:none;"></canvas>
+  <div class="toast" id="toast"></div>
+
+  <div class="game-container game-container-narrow" id="screen-start" style="z-index: 20;">
+    <img src="assets/Centrum_logo.png" alt="Centrum" style="max-width: 280px; margin-bottom: 30px;">
+    <div class="auth-title">Play & Earn</div>
+    <p style="color: var(--muted); margin-bottom: 40px; line-height: 1.6; font-size: 1.2rem; text-align: center;">
+      Play the interactive Centrum game.<br>
+      Earn 100 pts at the end!
+    </p>
+    <button class="btn-centrum" style="max-width: 300px; margin: 0 auto;" onclick="proceedFromStart()">Start Game</button>
+    <button class="btn-outline" id="btn-exit-start" style="margin-top: 20px; max-width: 300px; margin-left: auto; margin-right: auto;" onclick="goBack()">← Back to App</button>
+  </div>
+
+
+
+  <div class="game-container" id="screen-game" style="display: none; padding: 0; max-width: 100%; width: 100%; height: 100dvh; max-height: 100dvh; justify-content: flex-start; overflow: hidden; position: fixed; inset: 0; z-index: 50;">
+    <div class="embed-header">
+      <div style="text-align: left;">
+        <button class="btn-outline" style="width: auto; padding: 8px 16px; font-size: 0.95rem; border-color: transparent;" onclick="goBack()">← Exit</button>
+      </div>
+      
+      <div style="text-align: center;">
+        <img src="assets/Centrum_logo.png" alt="Centrum" style="height: 35px; vertical-align: middle;">
+      </div>
+      
+      <div style="text-align: right;">
+        <button id="btn-claim" class="btn-centrum" style="width: auto; padding: 8px 16px; font-size: 0.95rem;" disabled>Wait (32s)</button>
+      </div>
+    </div>
+    <div class="iframe-wrap">
+      <iframe src="https://strikeads.net/games/Centrum/energy/" allow="autoplay; fullscreen"></iframe>
+    </div>
+  </div>
+
+  <div id="pin-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:var(--surface2); padding:30px; border-radius:20px; text-align:center; max-width: 400px; width: 90%;">
+      <h2 style="color:#000000; margin-bottom:15px; font-size: 2rem;">Enter PIN</h2>
+      <p style="color:var(--muted); margin-bottom:20px;">Please enter the PIN code to claim your points.</p>
+      <input type="number" id="pin-input" style="padding:10px; font-size:1.5rem; width:100%; border:2px solid var(--border); border-radius:10px; margin-bottom:15px; text-align:center;">
+      <p id="pin-error" style="color:red; display:none; margin-bottom:15px; font-weight: 600;">Incorrect PIN. Try again.</p>
+      <button class="btn-centrum" onclick="checkPin()">Submit</button>
+    </div>
+  </div>
+
+  <div class="game-container game-container-narrow" id="screen-result" style="display: none; text-align: center; z-index: 20;">
+    <img src="assets/Centrum_logo.png" alt="Centrum" style="max-width: 200px; margin-bottom: 20px;">
+    <div class="auth-title" id="result-title">Game Complete!</div>
+    <div style="font-size: 3.5rem; font-weight: 900; color: var(--c-green); margin-bottom: 10px; line-height: 1;" id="result-score">100 pts</div>
+    <div style="color:var(--muted); font-size: 1.1rem; margin-bottom: 30px; font-weight: 500;">Hope you enjoyed the game!</div>
+    <div id="result-actions" style="width: 100%;"></div>
+  </div>
+
+  <script>
+    function launchConfetti(duration) {
+      const canvas = document.getElementById("confetti-canvas");
+      if(!canvas) return;
+      const ctx = canvas.getContext("2d");
+      canvas.style.display = "block";
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const pieces = [];
+      const colors = ["#E91E63", "#FF9800", "#FFC107", "#4CAF50", "#2196F3", "#9C27B0"]; 
+      for (let i = 0; i < 150; i++) pieces.push({ x: Math.random() * canvas.width, y: -10 - Math.random() * 200, r: 6 + Math.random() * 8, color: colors[Math.floor(Math.random() * colors.length)], vx: (Math.random() - 0.5) * 5, vy: 3 + Math.random() * 5, rot: Math.random() * 360, rs: (Math.random() - 0.5) * 8 });
+      const end = Date.now() + duration;
+      (function frame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach((p) => {
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.rot * Math.PI) / 180); ctx.fillStyle = p.color;
+          ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore();
+          p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.rot += p.rs;
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+        else { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; }
+      })();
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const uid = urlParams.get('uid');
+    const exhausted = urlParams.get('exhausted') === 'true';
+    const GAME_ID = 'centrum'; 
+    
+
+    let score = 100;
+    let countdownInterval;
+
+    window.onload = () => {
+      if (!uid) document.getElementById('btn-exit-start').style.display = 'none';
+    };
+
+    function goBack() { 
+      if (countdownInterval) clearInterval(countdownInterval);
+      if (uid) window.location.href = 'index.html'; 
+      else location.reload(); 
+    }
+
+    function proceedFromStart() {
+      document.getElementById('screen-start').style.display = 'none';
+      startGame();
+    }
+
+    function startGame() {
+      document.getElementById('screen-game').style.display = 'flex';
+
+      let claimTimer = 32;
+      const claimBtn = document.getElementById('btn-claim');
+      claimBtn.disabled = true;
+      claimBtn.textContent = `Wait (${claimTimer}s)`;
+
+      countdownInterval = setInterval(() => {
+        claimTimer--;
+        if (claimTimer > 0) {
+          claimBtn.textContent = `Wait (${claimTimer}s)`;
+        } else {
+          clearInterval(countdownInterval);
+          claimBtn.textContent = 'Claiming...';
+          showPinDialog();
+        }
+      }, 1000);
+    }
+
+   function showPinDialog() {
+      if (countdownInterval) clearInterval(countdownInterval);
+      
+      // Cut the game and transition directly to the result screen
+      document.getElementById('screen-game').style.display = 'none';
+      document.getElementById('screen-result').style.display = 'flex';
+
+      // Setup the result actions ahead of time so the screen looks complete under the modal
+      const actionsDiv = document.getElementById('result-actions');
+      actionsDiv.innerHTML = `<button class="btn-centrum" style="max-width: 400px; margin: 0 auto;" onclick="processPoints()">Collect Points & Complete</button>`;
+
+      // Show the PIN dialog as an overlay on top of the results screen
+      document.getElementById('pin-modal').style.display = 'flex';
+   }
+
+   function checkPin() {
+      const pin = document.getElementById('pin-input').value;
+      if (pin === '2013') {
+        document.getElementById('pin-modal').style.display = 'none';
+        finishGame();
+      } else {
+        document.getElementById('pin-error').style.display = 'block';
+      }
+   }
+
+   function finishGame() {
+      // The screen is already set up and visible from showPinDialog, just trigger the confetti!
+      launchConfetti(3000); 
+    }
+
+    function processPoints() {
+      const actionsDiv = document.getElementById('result-actions');
+      actionsDiv.innerHTML = "<p style='font-size: 1.2rem; font-weight: 600;'>Processing...</p>";
+
+      if (uid) {
+        window.location.href = `index.html?rewardGame=${GAME_ID}&rewardPts=5`;
+      } else {
+        const payload = JSON.stringify({ type: "game_reward", gameId: GAME_ID, points: 5, nonce: Date.now() });
+        const qr = qrcode(0, 'L'); qr.addData(payload); qr.make();
+        actionsDiv.innerHTML = `
+          <div style="background:var(--surface2); padding:25px; border-radius:24px; border:2px solid var(--border); display:inline-block; margin-bottom:20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05);">
+            <div style="background:white; padding:15px; border-radius:16px; border: 1px solid var(--border);">
+                ${qr.createImgTag(6)}
+            </div>
+          </div>
+          <p style="color:var(--muted); font-size:1.1rem; margin-bottom: 30px; font-weight: 500;">Scan this QR with your App to collect points.</p>
+          <button class="btn-outline" style="max-width: 300px; margin: 0 auto;" onclick="location.reload()">Start New Game</button>
+        `;
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast"); toast.textContent = msg; toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1500);
+    }
+  </script>
+<div style="position: fixed; bottom: 5px; left: 0; width: 100%; text-align: center; color: grey; font-size: 12px; pointer-events: none; z-index: 9999;">PM-EG-CNT-26-00007</div>
+</body>
+</html>

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Spin to Win - Haleon Partners Club</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --green: #4ade80;
+      --green-glow: rgba(74, 222, 128, 0.6);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.6);
+      --muted: #9ca3af;
+      --surface: #111418;
+      --surface2: #181c21;
+      --border: #1e2d24;
+    }
+
+    * { 
+      box-sizing: border-box; 
+      font-family: 'Poppins', sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-tap-highlight-color: transparent; 
+    }
+    
+    body { 
+      touch-action: none; 
+      overflow: hidden; 
+      color: white;
+      background-image: url('assets/Spin Game/gameBg.png');
+      background-size: cover; 
+      background-position: center; 
+      background-repeat: no-repeat;
+      background-color: #050a06; 
+    }
+
+    .game-container { 
+      width: 100%; 
+      max-width: min(100%, 100vh * 0.58); 
+      box-shadow: 0 0 40px rgba(0,0,0,0.5); 
+      margin: 0 auto; 
+      padding: 20px; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      position: relative;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.05); 
+      color: white; 
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      font-size: 0.85rem; 
+      font-weight: 600; 
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .btn-primary {
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+      font-size: 1.15rem;
+      padding: 14px 36px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(74, 222, 128, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+
+    .img-btn { 
+      cursor: pointer; 
+      transition: transform 0.1s ease; 
+    }
+    .img-btn:active { 
+      transform: scale(0.95); 
+    }
+
+    /* Wheel Container Styling */
+    .wheel-wrapper {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      margin: 20px auto;
+      border-radius: 50%;
+      border: 6px solid rgba(74, 222, 128, 0.4);
+      box-shadow: 0 0 30px rgba(0,0,0,0.7), 0 0 15px var(--green-glow);
+    }
+
+    #wheel {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .wheel-pointer {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0; 
+      height: 0; 
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 36px solid #ef4444;
+      z-index: 10;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+    }
+
+    .center-peg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 44px;
+      height: 44px;
+      background: #111418;
+      border: 3px solid var(--green);
+      border-radius: 50%;
+      z-index: 5;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+    }
+
+    .spin-btn {
+      display: block;
+      width: 220px;
+      margin: 10px auto 0;
+      padding: 14px;
+      border-radius: 30px;
+      font-size: 1.2rem;
+      letter-spacing: 1px;
+    }
+
+    .toast { 
+      position: fixed; 
+      top: 30px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      background: white; 
+      color: black; 
+      padding: 10px 25px; 
+      border-radius: 50px; 
+      font-weight: 700; 
+      font-size: 1.1rem; 
+      opacity: 0; 
+      pointer-events: none; 
+      transition: opacity 0.3s; 
+      z-index: 10000; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;display:none;"></canvas>
+  <div class="toast" id="toast"></div>
+
+  <!-- START SCREEN -->
+  <div class="game-container" id="screen-start" style="text-align: center; display: flex; flex-direction: column; position: relative;">
+    <button class="btn-secondary" id="btn-exit-start" style="position: absolute; top: 15px; left: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem; z-index: 50; border-color: var(--green); color: var(--green); background: transparent;" onclick="goBack()">← Back to App</button>
+
+    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding-top: 30px;">
+      <img src="assets/Spin Game/Spin.png" alt="Spin to Win Logo" style="max-width: 180px; margin: 0 auto 15px; display: block; object-fit: contain;">
+      <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 10px; line-height: 1.1; letter-spacing: -1px;">Spin to<br>Win</h1>
+      <p style="color: #e5e7eb; font-size: 1.05rem; margin-bottom: 8px;">Test your luck! You get ONE spin to win points.</p>
+      <p style="font-weight: 700; font-size: 1.1rem; margin-bottom: 30px; color: var(--green);">Watch out for "Tough Luck" slices!</p>
+      
+      <img src="assets/Spin Game/startGameButton.png" alt="Start Game" class="img-btn" style="max-width: 250px; margin: 0 auto; display: block;" onclick="proceedFromStart()">
+    </div>
+
+    <div style="padding-bottom: 25px; flex-shrink: 0;">
+      <img src="assets/Spin Game/brought to you by.png" alt="Sponsor" style="max-width: 200px; margin: 0 auto; display: block;">
+    </div>
+  </div>
+
+  <!-- GAMEPLAY SCREEN -->
+  <div class="game-container" id="screen-game" style="display: none; padding: 15px; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; z-index: 20; position: relative;">
+      <button class="btn-secondary" onclick="goBack()">← Exit</button>
+      <img src="assets/logo1.png" alt="Haleon Logo" style="height: 30px; object-fit: contain;">
+    </div>
+
+    <div style="text-align: center; margin-top: 10px; margin-bottom: 10px;">
+      <h2 style="font-size: 1.8rem; font-weight: 800; color: #fff;">Spin the Wheel</h2>
+      <p style="font-size: 0.85rem; color: var(--muted);">Tap SPIN NOW to claim your prize!</p>
+    </div>
+
+    <div class="wheel-wrapper">
+      <div class="wheel-pointer"></div>
+      <div class="center-peg"></div>
+      <canvas id="wheel" width="600" height="600"></canvas>
+    </div>
+
+    <button class="btn-primary spin-btn" id="btn-spin" onclick="spinWheel()">SPIN NOW! 🎡</button>
+
+    <div style="margin-top: auto; text-align: center; padding-top: 10px; padding-bottom: 20px; z-index: 10; position: relative;">
+      <img src="assets/Spin Game/brought to you by.png" alt="Sponsor" style="max-width: 160px; margin: 0 auto; display: block;">
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div class="game-container" id="screen-result" style="display: none; text-align: center; justify-content: center;">
+    <div style="background: var(--surface2); border: 1px solid var(--green); backdrop-filter: blur(15px); padding: 40px 30px; border-radius: 28px; box-shadow: 0 15px 45px rgba(0,0,0,0.5); width: 100%; max-width: 500px; display: flex; flex-direction: column; align-items: center;">
+      <div style="font-size: 4.5rem; margin-bottom: 10px;" id="result-icon">🏆</div>
+      <div style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-bottom: 8px;" id="result-title">Wheel Stopped!</div>
+      <div style="font-size: 3rem; font-weight: 800; color: var(--green); margin-bottom: 20px;" id="result-score">0 pts</div>
+      <div id="result-actions" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px;"></div>
+    </div>
+  </div>
+
+  <script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+    
+    function playSound(type) {
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator(); 
+      const gain = audioCtx.createGain();
+      osc.connect(gain); 
+      gain.connect(audioCtx.destination);
+      
+      if(type === 'win') {
+        osc.type = 'sine'; 
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); 
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); 
+        osc.frequency.setValueAtTime(1046.50, audioCtx.currentTime + 0.3); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.5); 
+        osc.start(); 
+        osc.stop(audioCtx.currentTime + 0.5);
+      } else if(type === 'lose') {
+        osc.type = 'sawtooth'; 
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime); 
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.5); 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+        gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.5); 
+        osc.start(); 
+        osc.stop(audioCtx.currentTime + 0.5);
+      }
+    }
+
+    function launchConfetti(duration) {
+      const canvas = document.getElementById("confetti-canvas"); 
+      const ctx = canvas.getContext("2d"); 
+      canvas.style.display = "block";
+      canvas.width = window.innerWidth; 
+      canvas.height = window.innerHeight;
+      const pieces = []; 
+      const colors = ["#4ade80", "#22c55e", "#f0f4f8", "#facc15", "#60a5fa", "#f472b6"];
+      for (let i = 0; i < 100; i++) {
+        pieces.push({ 
+          x: Math.random() * canvas.width, 
+          y: -10 - Math.random() * 200, 
+          r: 4 + Math.random() * 6, 
+          color: colors[Math.floor(Math.random() * colors.length)], 
+          vx: (Math.random() - 0.5) * 4, 
+          vy: 2 + Math.random() * 4, 
+          rot: Math.random() * 360, 
+          rs: (Math.random() - 0.5) * 6 
+        });
+      }
+      const end = Date.now() + duration;
+      (function frame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach((p) => {
+          ctx.save(); 
+          ctx.translate(p.x, p.y); 
+          ctx.rotate((p.rot * Math.PI) / 180); 
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); 
+          ctx.restore(); 
+          p.x += p.vx; 
+          p.y += p.vy; 
+          p.vy += 0.05; 
+          p.rot += p.rs;
+        });
+        if (Date.now() < end) requestAnimationFrame(frame); 
+        else { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; }
+      })();
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const uid = urlParams.get('uid');
+    const exhausted = urlParams.get('exhausted') === 'true';
+    const GAME_ID = 'spin';
+
+    let score = 0;
+    let isSpinning = false;
+    let spinCount = 0;
+
+    const segments = [
+      { label: '50 pts', value: 50, color: '#1e293b', text: '#4ade80' },
+      { label: 'Tough Luck', value: 0, color: '#0f172a', text: '#ef4444' },
+      { label: '20 pts', value: 20, color: '#1e293b', text: '#4ade80' },
+      { label: '15 pts', value: 15, color: '#0f172a', text: '#4ade80' },
+      { label: '100 pts', value: 100, color: '#1e293b', text: '#4ade80' },
+      { label: '10 pts', value: 10, color: '#0f172a', text: '#4ade80' },
+      { label: 'Tough Luck', value: 0, color: '#1e293b', text: '#ef4444' },
+      { label: '30 pts', value: 30, color: '#0f172a', text: '#4ade80' },
+      { label: 'Tough Luck', value: 0, color: '#1e293b', text: '#ef4444' },
+      { label: '50 pts', value: 50, color: '#0f172a', text: '#4ade80' },
+      { label: 'Tough Luck', value: 0, color: '#1e293b', text: '#ef4444' },
+      { label: '10 pts', value: 10, color: '#0f172a', text: '#4ade80' },
+      { label: '75 pts', value: 75, color: '#1e293b', text: '#4ade80' },
+      { label: '40 pts', value: 40, color: '#0f172a', text: '#4ade80' },
+      { label: '25 pts', value: 25, color: '#1e293b', text: '#4ade80' },
+      { label: '200 pts', value: 200, color: '#0f172a', text: '#38bdf8' }
+    ];
+
+    window.onload = () => {
+      if (!uid) {
+        const btn = document.getElementById('btn-exit-start');
+        if (btn) btn.style.display = 'none';
+      }
+      drawWheel();
+    };
+
+    function goBack() { 
+      if (uid) window.location.href = 'index.html'; 
+      else location.reload(); 
+    }
+
+    function proceedFromStart() {
+      document.getElementById('screen-start').style.display = 'none';
+      startGame();
+    }
+
+    function startGame() {
+      document.getElementById('screen-game').style.display = 'flex';
+    }
+
+    function drawWheel() {
+      const canvas = document.getElementById('wheel');
+      const ctx = canvas.getContext('2d');
+      const center = canvas.width / 2;
+      const radius = center;
+      const arc = (2 * Math.PI) / segments.length;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < segments.length; i++) {
+        const angle = i * arc - (Math.PI / 2) - (arc / 2); 
+        
+        ctx.beginPath();
+        ctx.fillStyle = segments[i].color;
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, angle, angle + arc, false);
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(angle + arc / 2);
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = segments[i].text;
+        ctx.font = 'bold 28px Poppins';
+        ctx.fillText(segments[i].label, radius - 30, 0);
+        ctx.restore();
+      }
+    }
+
+    function spinWheel() {
+      if (isSpinning) return;
+      isSpinning = true;
+      spinCount++;
+
+      const btn = document.getElementById('btn-spin');
+      btn.disabled = true;
+      btn.style.opacity = 0.5;
+
+      const winIdx = Math.floor(Math.random() * segments.length);
+      const sliceAngle = 360 / segments.length;
+      const randomOffset = Math.floor(Math.random() * (sliceAngle - 4)) - (sliceAngle / 2 - 2);
+
+      const extraSpins = 360 * 5 * spinCount; 
+      const targetRotation = extraSpins + (360 - (winIdx * sliceAngle)) + randomOffset;
+
+      const canvas = document.getElementById('wheel');
+      canvas.style.transition = 'transform 4.5s cubic-bezier(0.15, 0.85, 0.15, 1)';
+      canvas.style.transform = `rotate(${targetRotation}deg)`;
+
+      setTimeout(() => {
+        handleSpinResult(segments[winIdx]);
+      }, 4600);
+    }
+
+    function handleSpinResult(result) {
+      score = result.value;
+      finishGame(result.label);
+    }
+
+    function finishGame(resultLabel) {
+      document.getElementById('screen-game').style.display = 'none';
+      document.getElementById('screen-result').style.display = 'flex';
+      
+      const resultScore = document.getElementById('result-score');
+      const resultIcon = document.getElementById('result-icon');
+      const actionsDiv = document.getElementById('result-actions');
+
+      if (score === 0) {
+        resultScore.textContent = "Tough Luck!";
+        resultScore.style.color = "#ef4444";
+        resultIcon.textContent = "💔";
+        playSound('lose');
+        
+        actionsDiv.innerHTML = `<button class="btn-secondary" style="width: 100%; max-width: 250px; padding: 12px;" onclick="goBack()">Return to Home</button>`;
+        return;
+      } else {
+        resultScore.textContent = score + " pts";
+        resultScore.style.color = "var(--green)";
+        resultIcon.textContent = "🎉";
+        playSound('win');
+        launchConfetti(3000);
+      }
+
+      actionsDiv.innerHTML = `
+        <img src="assets/Spin Game/startNewGameButton.png" alt="Collect Points" class="img-btn" style="max-width: 250px;" onclick="processPoints()">
+      `;
+    }
+
+    function processPoints() {
+      if (score === 0) { goBack(); return; }
+
+      const actionsDiv = document.getElementById('result-actions');
+      actionsDiv.innerHTML = "Processing...";
+
+      if (uid) {
+        window.location.href = `index.html?rewardGame=${GAME_ID}&rewardPts=5`;
+      } else {
+        const payload = JSON.stringify({ type: "game_reward", gameId: GAME_ID, points: 5, nonce: Date.now() });
+        const qr = qrcode(0, 'L');
+        qr.addData(payload);
+        qr.make();
+        actionsDiv.innerHTML = `
+          <div style="background:white; padding:10px; display:inline-block; border-radius:10px; margin-bottom:10px;">
+            ${qr.createImgTag(5)}
+          </div>
+          <p style="color:var(--muted); font-size:0.9rem;">Scan this QR with your Haleon app to collect points.</p>
+          <button class="btn-secondary" style="margin-top:20px;" onclick="location.reload()">Start New Game</button>
+        `;
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast"); toast.textContent = msg; toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2000);
+    }
+  </script>
+  <div style="position: fixed; bottom: 5px; left: 0; width: 100%; text-align: center; color: grey; font-size: 12px; pointer-events: none; z-index: 9999;">PM-EG-CNT-26-00007</div>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Word Search - Haleon Partners Club</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --green: #4ade80;
+      --green-glow: rgba(74, 222, 128, 0.6);
+      --red: #ef4444;
+      --red-glow: rgba(239, 68, 68, 0.6);
+      --muted: #9ca3af;
+      --surface: #111418;
+      --surface2: #181c21;
+      --border: #1e2d24;
+    }
+
+    * { 
+      box-sizing: border-box; 
+      font-family: 'Poppins', sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-tap-highlight-color: transparent; 
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    
+    body { 
+      touch-action: none; 
+      overflow: hidden; 
+      color: white;
+      background-image: url('assets/memory game/memoryGameBg.png');
+      background-size: cover; 
+      background-position: center; 
+      background-repeat: no-repeat;
+      background-color: #050a06; 
+    }
+
+    .game-container { 
+      width: 100%; 
+      max-width: min(100%, 100vh * 0.58); 
+      box-shadow: 0 0 40px rgba(0,0,0,0.5); 
+      margin: 0 auto; 
+      padding: 20px; 
+      height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      position: relative;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.05); 
+      color: white; 
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 8px 16px; 
+      border-radius: 8px; 
+      font-size: 0.85rem; 
+      font-weight: 600; 
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.15);
+    }
+    .img-btn { 
+      cursor: pointer; 
+      transition: transform 0.1s ease; 
+    }
+    .img-btn:active { 
+      transform: scale(0.95); 
+    }
+
+    /* --- HUD Styling (Same as Memory Game) --- */
+    .hud { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      background: rgba(19, 27, 22, 0.85); 
+      border-radius: 12px; 
+      padding: 10px 0; 
+      margin-bottom: 12px; 
+      border: 1px solid var(--border); 
+      flex-shrink: 0; 
+      z-index: 10; 
+      position: relative;
+    }
+    .hud-box { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .hud-lbl { color: #9ca3af; font-size: 0.7rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+    .hud-val { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+    .hud-val.time { color: var(--green); }
+    .hud-val.warning { color: var(--red); animation: pulse 0.8s infinite alternate; }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+    /* --- Target Words Bar --- */
+    .words-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 12px;
+      z-index: 10;
+    }
+    .word-badge {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #e5e7eb;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .word-badge.found {
+      background: var(--found-color, var(--green));
+      color: #000;
+      border-color: transparent;
+      box-shadow: 0 0 12px var(--found-color, var(--green-glow));
+      text-decoration: line-through;
+    }
+    .word-badge.found::after {
+      content: '✓';
+      text-decoration: none;
+      font-weight: 900;
+    }
+
+    /* --- Word Search Grid Container --- */
+    .grid-wrapper {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-width: 100%;
+      margin: 0 auto auto auto;
+      background: rgba(13, 25, 17, 0.7);
+      border: 2px solid rgba(74, 222, 128, 0.3);
+      border-radius: 16px;
+      padding: 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    /* SVG Overlay for Highlight Capsules */
+    .grid-svg-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .word-grid {
+      display: grid;
+      grid-template-columns: repeat(11, 1fr);
+      grid-template-rows: repeat(11, 1fr);
+      gap: 2px;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      z-index: 3;
+    }
+
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(0.75rem, 3.2vw, 1.15rem);
+      font-weight: 800;
+      color: #ffffff;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .cell.selected {
+      background: rgba(74, 222, 128, 0.25);
+      color: #ffffff;
+      transform: scale(1.08);
+    }
+
+    .toast { 
+      position: fixed; 
+      top: 30px; 
+      left: 50%; 
+      transform: translateX(-50%); 
+      background: white; 
+      color: black; 
+      padding: 10px 25px; 
+      border-radius: 50px; 
+      font-weight: 700; 
+      font-size: 1.1rem; 
+      opacity: 0; 
+      pointer-events: none; 
+      transition: opacity 0.3s; 
+      z-index: 10000; 
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+
+<body>
+  <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;display:none;"></canvas>
+  <div class="toast" id="toast"></div>
+
+  <!-- START SCREEN (Matching Memory Game Style) -->
+  <div class="game-container" id="screen-start" style="text-align: center; display: flex; flex-direction: column; position: relative;">
+    <button class="btn-secondary" id="btn-exit-start" style="position: absolute; top: 15px; left: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem; z-index: 50; border-color: var(--green); color: var(--green); background: transparent;" onclick="goBack()">← Back to App</button>
+
+    <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding-top: 30px;">
+      <div style="font-size: 4.5rem; margin-bottom: 10px; filter: drop-shadow(0 0 15px var(--green-glow));">🔍</div>
+      <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 10px; line-height: 1.1; letter-spacing: -1px;">Word<br>Search</h1>
+      <p style="color: #e5e7eb; font-size: 1.05rem; margin-bottom: 8px;">Find all Haleon brand words!</p>
+      <p style="font-weight: 700; font-size: 1.1rem; margin-bottom: 30px; color: var(--green);">Find CENTRUM, PANADOL, HALEON, & SENSODYNE!</p>
+      
+      <img src="assets/memory game/startGameButton.png" alt="Start Game" class="img-btn" style="max-width: 250px; margin: 0 auto; display: block;" onclick="proceedFromStart()">
+    </div>
+
+    <div style="padding-bottom: 25px; flex-shrink: 0;">
+      <img src="assets/memory game/brought to you by.png" alt="Sponsor" style="max-width: 200px; margin: 0 auto; display: block;">
+    </div>
+  </div>
+
+  <!-- GAMEPLAY SCREEN (Matching Memory Game Style) -->
+  <div class="game-container" id="screen-game" style="display: none; padding: 15px; flex-direction: column;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; z-index: 20; position: relative;">
+      <button class="btn-secondary" onclick="goBack()">← Exit</button>
+    </div>
+
+    <div class="hud">
+      <div class="hud-box"><div class="hud-lbl">TIME LEFT</div><div class="hud-val time" id="timer-display">90s</div></div>
+      <div style="width: 1px; height: 35px; background: #2a3a30;"></div>
+      <div class="hud-box"><div class="hud-lbl">WORDS</div><div class="hud-val" id="words-display">0<span style="color: #6b7280; font-size: 1.2rem;">/4</span></div></div>
+    </div>
+
+    <!-- Word list badges -->
+    <div class="words-bar" id="words-bar"></div>
+
+    <!-- Grid Container -->
+    <div class="grid-wrapper" id="grid-wrapper">
+      <svg class="grid-svg-overlay" id="svg-overlay"></svg>
+      <div class="word-grid" id="word-grid"></div>
+    </div>
+
+    <div style="margin-top: auto; text-align: center; padding-top: 10px; padding-bottom: 20px; z-index: 10; position: relative;">
+      <img src="assets/memory game/brought to you by.png" alt="Sponsor" style="max-width: 160px; margin: 0 auto; display: block;">
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN (Matching Memory Game Style) -->
+  <div class="game-container" id="screen-result" style="display: none; text-align: center; justify-content: center;">
+    <div style="font-size: 4.5rem; margin-bottom: 10px;" id="result-icon">🏆</div>
+    <div style="font-size: 2.5rem; font-weight: 800; margin-bottom: 10px;" id="result-title">Complete!</div>
+    <div style="color:#d1d5db; font-size: 1.1rem; margin-bottom: 30px;" id="result-breakdown">Great job finding all Haleon brand words!</div>
+    
+    <div id="result-actions" style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px;">
+      <img src="assets/memory game/startNewGameButton.png" alt="Play Again" class="img-btn" style="max-width: 250px;" onclick="goBackWithPoints()">
+    </div>
+  </div>
+
+  <script>
+    // --- QUERY PARAMS & REWARD HANDLING ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const uid = urlParams.get('uid');
+    const exhausted = urlParams.get('exhausted') === 'true';
+
+    // --- GAME CONSTANTS ---
+    const GRID_SIZE = 11;
+    const TARGET_WORDS = [
+      { word: "CENTRUM", color: "#00d2ff" },   // Cyan
+      { word: "PANADOL", alt: "PANAOL", color: "#4ade80" },   // Emerald Green
+      { word: "HALEON", color: "#ec4899" },    // Vivid Pink
+      { word: "SENSODYNE", color: "#facc15" }  // Yellow
+    ];
+
+    let gridMatrix = []; // 11x11 letter matrix
+    let wordPlacements = []; // stores target word coordinates
+    let foundWords = new Set();
+    let foundLines = []; // array of { start: [r,c], end: [r,c], color }
+    
+    let isSelecting = false;
+    let startCell = null;
+    let currentCell = null;
+    let selectedCells = [];
+
+    let timeLeft = 90;
+    let timerInterval = null;
+
+    // --- AUDIO SYNTHESIZER ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playTone(freq, duration = 0.15, type = 'sine') {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function playMatchSound() {
+      playTone(523.25, 0.1, 'triangle'); // C5
+      setTimeout(() => playTone(659.25, 0.1, 'triangle'), 100); // E5
+      setTimeout(() => playTone(783.99, 0.2, 'triangle'), 200); // G5
+    }
+
+    window.onload = () => { 
+      if (!uid) { 
+        const btn = document.getElementById('btn-exit-start'); 
+        if (btn) btn.style.display = 'none'; 
+      } 
+    };
+
+    function goBack() {
+      if (uid) window.location.href = 'index.html';
+      else location.reload();
+    }
+
+    function goBackWithPoints() {
+      if (uid && !exhausted) {
+        window.location.href = `index.html?rewardGame=word&rewardPts=5`;
+      } else {
+        goBack();
+      }
+    }
+
+    function proceedFromStart() {
+      document.getElementById('screen-start').style.display = 'none';
+      document.getElementById('screen-game').style.display = 'flex';
+      initGame();
+    }
+
+    // --- GRID GENERATION & WORD PLACEMENT ---
+    function initGame() {
+      foundWords.clear();
+      foundLines = [];
+      timeLeft = 90;
+      updateTimerDisplay();
+      updateWordsBar();
+      document.getElementById('words-display').innerHTML = `0<span style="color: #6b7280; font-size: 1.2rem;">/4</span>`;
+
+      generateGrid();
+      renderGrid();
+      setupInteractions();
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          endGame(false);
+        }
+      }, 1000);
+    }
+
+    function generateGrid() {
+      let placed = false;
+      while (!placed) {
+        gridMatrix = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(''));
+        wordPlacements = [];
+        placed = true;
+
+        // Directions: [rowStep, colStep]
+        const directions = [
+          [0, 1],   // Horizontal R
+          [1, 0],   // Vertical D
+          [1, 1],   // Diagonal DR
+          [-1, 1],  // Diagonal UR
+          [0, -1],  // Horizontal L
+          [1, -1]   // Diagonal DL
+        ];
+
+        for (const item of TARGET_WORDS) {
+          const w = item.word;
+          let wordPlaced = false;
+          let attempts = 0;
+
+          while (!wordPlaced && attempts < 200) {
+            attempts++;
+            const dir = directions[Math.floor(Math.random() * directions.length)];
+            const rStart = Math.floor(Math.random() * GRID_SIZE);
+            const cStart = Math.floor(Math.random() * GRID_SIZE);
+
+            const rEnd = rStart + dir[0] * (w.length - 1);
+            const cEnd = cStart + dir[1] * (w.length - 1);
+
+            if (rEnd >= 0 && rEnd < GRID_SIZE && cEnd >= 0 && cEnd < GRID_SIZE) {
+              let canPlace = true;
+              for (let i = 0; i < w.length; i++) {
+                const r = rStart + dir[0] * i;
+                const c = cStart + dir[1] * i;
+                if (gridMatrix[r][c] !== '' && gridMatrix[r][c] !== w[i]) {
+                  canPlace = false;
+                  break;
+                }
+              }
+
+              if (canPlace) {
+                const coords = [];
+                for (let i = 0; i < w.length; i++) {
+                  const r = rStart + dir[0] * i;
+                  const c = cStart + dir[1] * i;
+                  gridMatrix[r][c] = w[i];
+                  coords.push([r, c]);
+                }
+                wordPlacements.push({
+                  word: item.word,
+                  alt: item.alt,
+                  color: item.color,
+                  coords: coords,
+                  rStart, cStart, rEnd, cEnd
+                });
+                wordPlaced = true;
+              }
+            }
+          }
+
+          if (!wordPlaced) {
+            placed = false;
+            break;
+          }
+        }
+      }
+
+      // Fill remaining empty cells with random letters A-Z
+      const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (!gridMatrix[r][c]) {
+            gridMatrix[r][c] = alpha[Math.floor(Math.random() * alpha.length)];
+          }
+        }
+      }
+    }
+
+    function renderGrid() {
+      const gridEl = document.getElementById('word-grid');
+      gridEl.innerHTML = '';
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.textContent = gridMatrix[r][c];
+          gridEl.appendChild(cell);
+        }
+      }
+      drawSvgOverlays();
+    }
+
+    function updateWordsBar() {
+      const bar = document.getElementById('words-bar');
+      bar.innerHTML = '';
+      TARGET_WORDS.forEach(item => {
+        const badge = document.createElement('div');
+        badge.className = 'word-badge' + (foundWords.has(item.word) ? ' found' : '');
+        badge.dataset.word = item.word;
+        if (foundWords.has(item.word)) {
+          badge.style.setProperty('--found-color', item.color);
+        }
+        badge.textContent = item.word;
+        bar.appendChild(badge);
+      });
+    }
+
+    function updateTimerDisplay() {
+      const el = document.getElementById('timer-display');
+      el.textContent = timeLeft + 's';
+      if (timeLeft <= 15) el.classList.add('warning');
+      else el.classList.remove('warning');
+    }
+
+    // --- INTERACTION & SELECTION HANDLING ---
+    function setupInteractions() {
+      const wrapper = document.getElementById('grid-wrapper');
+
+      wrapper.onpointerdown = (e) => {
+        e.preventDefault();
+        const cell = getCellFromPoint(e.clientX, e.clientY);
+        if (!cell) return;
+        isSelecting = true;
+        startCell = cell;
+        currentCell = cell;
+        updateSelection();
+        playTone(400, 0.05);
+      };
+
+      wrapper.onpointermove = (e) => {
+        if (!isSelecting) return;
+        e.preventDefault();
+        const cell = getCellFromPoint(e.clientX, e.clientY);
+        if (cell && (cell.r !== currentCell.r || cell.c !== currentCell.c)) {
+          currentCell = cell;
+          updateSelection();
+          playTone(450, 0.04);
+        }
+      };
+
+      window.onpointerup = (e) => {
+        if (!isSelecting) return;
+        isSelecting = false;
+        checkSelectedWord();
+        clearSelection();
+      };
+    }
+
+    function getCellFromPoint(x, y) {
+      const el = document.elementFromPoint(x, y);
+      if (el && el.classList.contains('cell')) {
+        return {
+          r: parseInt(el.dataset.row, 10),
+          c: parseInt(el.dataset.col, 10),
+          el: el
+        };
+      }
+      return null;
+    }
+
+    function updateSelection() {
+      clearSelection();
+      if (!startCell || !currentCell) return;
+
+      const r1 = startCell.r, c1 = startCell.c;
+      const r2 = currentCell.r, c2 = currentCell.c;
+
+      const dr = r2 - r1;
+      const dc = c2 - c1;
+
+      // Check if line is horizontal, vertical, or 45-deg diagonal
+      if (dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc)) {
+        const steps = Math.max(Math.abs(dr), Math.abs(dc));
+        const stepR = dr === 0 ? 0 : dr / steps;
+        const stepC = dc === 0 ? 0 : dc / steps;
+
+        selectedCells = [];
+        for (let i = 0; i <= steps; i++) {
+          const r = r1 + stepR * i;
+          const c = c1 + stepC * i;
+          const cellEl = document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`);
+          if (cellEl) {
+            cellEl.classList.add('selected');
+            selectedCells.push({ r, c, el: cellEl, char: gridMatrix[r][c] });
+          }
+        }
+      }
+      drawSvgOverlays();
+    }
+
+    function clearSelection() {
+      document.querySelectorAll('.cell.selected').forEach(c => c.classList.remove('selected'));
+      selectedCells = [];
+      drawSvgOverlays();
+    }
+
+    function checkSelectedWord() {
+      if (selectedCells.length < 3) return;
+
+      const formedWord = selectedCells.map(c => c.char).join('');
+      const reverseWord = selectedCells.map(c => c.char).reverse().join('');
+
+      for (const target of TARGET_WORDS) {
+        if (!foundWords.has(target.word)) {
+          const matchPrimary = (formedWord === target.word || reverseWord === target.word);
+          const matchAlt = target.alt && (formedWord === target.alt || reverseWord === target.alt);
+
+          if (matchPrimary || matchAlt) {
+            foundWords.add(target.word);
+            foundLines.push({
+              start: [selectedCells[0].r, selectedCells[0].c],
+              end: [selectedCells[selectedCells.length - 1].r, selectedCells[selectedCells.length - 1].c],
+              color: target.color
+            });
+
+            playMatchSound();
+            showToast(`Found ${target.word}! 🎉`);
+            updateWordsBar();
+
+            document.getElementById('words-display').innerHTML = `${foundWords.size}<span style="color: #6b7280; font-size: 1.2rem;">/4</span>`;
+
+            if (foundWords.size === TARGET_WORDS.length) {
+              clearInterval(timerInterval);
+              setTimeout(() => endGame(true), 600);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // --- SVG CAPSULE HIGHLIGHT DRAWING ---
+    function drawSvgOverlays() {
+      const svg = document.getElementById('svg-overlay');
+      const wrapper = document.getElementById('grid-wrapper');
+      if (!svg || !wrapper) return;
+
+      const rect = wrapper.getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+      svg.innerHTML = '';
+
+      // 1. Draw Permanent Found Word Capsules
+      foundLines.forEach(line => {
+        drawCapsule(svg, line.start, line.end, line.color, 0.75, 1.0);
+      });
+
+      // 2. Draw Active Dragged Selection Capsule
+      if (selectedCells.length > 1) {
+        const start = [selectedCells[0].r, selectedCells[0].c];
+        const end = [selectedCells[selectedCells.length - 1].r, selectedCells[selectedCells.length - 1].c];
+        drawCapsule(svg, start, end, "#4ade80", 0.45, 0.85);
+      }
+    }
+
+    function drawCapsule(svg, start, end, color, opacity, strokeOpacity) {
+      const startEl = document.querySelector(`.cell[data-row="${start[0]}"][data-col="${start[1]}"]`);
+      const endEl = document.querySelector(`.cell[data-row="${end[0]}"][data-col="${end[1]}"]`);
+      if (!startEl || !endEl) return;
+
+      const wrapper = document.getElementById('grid-wrapper').getBoundingClientRect();
+      const r1 = startEl.getBoundingClientRect();
+      const r2 = endEl.getBoundingClientRect();
+
+      const x1 = (r1.left + r1.right) / 2 - wrapper.left;
+      const y1 = (r1.top + r1.bottom) / 2 - wrapper.top;
+      const x2 = (r2.left + r2.right) / 2 - wrapper.left;
+      const y2 = (r2.top + r2.bottom) / 2 - wrapper.top;
+
+      const strokeWidth = Math.min(r1.width, r1.height) * 0.78;
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1);
+      line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2);
+      line.setAttribute('y2', y2);
+      line.setAttribute('stroke', color);
+      line.setAttribute('stroke-width', strokeWidth);
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('opacity', opacity);
+      line.setAttribute('style', `filter: drop-shadow(0 0 8px ${color});`);
+
+      svg.appendChild(line);
+    }
+
+    window.addEventListener('resize', drawSvgOverlays);
+
+    // --- GAME END & CONFETTI ---
+    function endGame(isWin) {
+      document.getElementById('screen-game').style.display = 'none';
+      document.getElementById('screen-result').style.display = 'flex';
+
+      const actionsEl = document.getElementById('result-actions');
+
+      if (isWin) {
+        document.getElementById('result-title').textContent = "Complete!";
+        document.getElementById('result-icon').textContent = "🏆";
+        document.getElementById('result-breakdown').textContent = "Great job finding all Haleon brand words!";
+        launchConfetti(3500);
+        if (actionsEl) {
+          actionsEl.innerHTML = `<img src="assets/memory game/startNewGameButton.png" alt="Play Again" class="img-btn" style="max-width: 250px;" onclick="goBackWithPoints()">`;
+        }
+      } else {
+        document.getElementById('result-title').textContent = "Time's Up!";
+        document.getElementById('result-icon').textContent = "⏱️";
+        document.getElementById('result-breakdown').textContent = `You found ${foundWords.size} out of 4 words.`;
+        if (actionsEl) {
+          actionsEl.innerHTML = `
+            <img src="assets/memory game/startNewGameButton.png" alt="Try Again" class="img-btn" style="max-width: 250px;" onclick="proceedFromStart()">
+            <button class="btn-secondary" style="margin-top: 10px;" onclick="goBack()">Exit to App</button>
+          `;
+        }
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+
+    function launchConfetti(duration) {
+      const canvas = document.getElementById("confetti-canvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      canvas.style.display = "block";
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const pieces = [];
+      const colors = ["#4ade80", "#00d2ff", "#ec4899", "#facc15"];
+      for (let i = 0; i < 100; i++) pieces.push({ x: Math.random() * canvas.width, y: -10 - Math.random() * 200, r: 5 + Math.random() * 7, color: colors[Math.floor(Math.random() * colors.length)], vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 4, rot: Math.random() * 360, rs: (Math.random() - 0.5) * 6 });
+      const end = Date.now() + duration;
+      (function frame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach((p) => {
+          ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.rot * Math.PI) / 180); ctx.fillStyle = p.color;
+          ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore();
+          p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.rot += p.rs;
+        });
+        if (Date.now() < end) requestAnimationFrame(frame);
+        else { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; }
+      })();
+    }
+  </script>
+</body>
+</html>

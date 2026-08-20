@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Panadol Myth vs Fact</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+  <style>
+    * { 
+      box-sizing: border-box; 
+      font-family: 'Poppins', sans-serif; 
+      margin: 0; 
+      padding: 0; 
+      -webkit-tap-highlight-color: transparent; 
+    }
+    
+    body { 
+      touch-action: none; 
+      overflow: hidden; 
+      background-image: url('assets/Myth & Fact/background.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-color: #00122e; 
+    }
+
+    /* Rotation Overlay for Portrait Mobile */
+    #rotate-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      color: white;
+      z-index: 100000;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      padding: 20px;
+    }
+
+    #rotate-overlay svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      animation: rotateIcon 2s infinite ease-in-out;
+    }
+
+    @keyframes rotateIcon {
+      0% { transform: rotate(0deg); }
+      50% { transform: rotate(-90deg); }
+      100% { transform: rotate(-90deg); }
+    }
+
+    #rotate-overlay h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    }
+
+    #rotate-overlay p {
+      font-size: 16px;
+      color: #ccc;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+
+    /* Dynamic Rotation Overlay (Controlled via JS) */
+
+    .game-container { 
+      width: 100vw; 
+      max-width: 100vw; 
+      box-shadow: 0 0 40px rgba(0,0,0,0.5); 
+      margin: 0 auto; 
+      padding: 0; 
+      min-height: 100vh; 
+      display: flex; 
+      flex-direction: column; 
+      position: relative;
+    }
+
+    /* Top Header/HUD */
+    .game-header { 
+      position: absolute; top: 15px; left: 0; width: 100%; padding: 0 20px; z-index: 20; 
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .score-display { 
+      font-weight: 800; color: #4ade80; font-size: 1.2rem; 
+      background: rgba(255,255,255,0.1); padding: 6px 16px; 
+      border-radius: 8px; border: 1px solid #4ade80; 
+    }
+
+    .mode-card { 
+      background: rgba(255,255,255,0.05); 
+      border: 1px solid rgba(255,255,255,0.1); 
+      border-radius: 16px; 
+      padding: 20px; 
+      margin-bottom: 16px; 
+      text-align: center; 
+      cursor: pointer; 
+      transition: 0.2s; 
+    }
+    .mode-card:hover { border-color: #38BDF8; }
+
+    /* --- RESPONSIVE GAME BOARD --- */
+    .game-board {
+      position: absolute; 
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+    }
+
+    .game-board-bg {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: block; pointer-events: none; object-fit: fill; z-index: 0;
+    }
+
+    /* Maps perfectly to the Blue Ribbon */
+    #q-progress {
+      position: absolute; top: 16.5%; left: 15%; width: 70%; height: 4.5%; 
+      display: flex; align-items: center; justify-content: center; text-align: center; 
+      color: white; font-weight: 700; font-size: clamp(0.9rem, 3.5vw, 1.2rem); z-index: 15;
+    }
+
+    /* Maps perfectly inside the paper */
+    #q-text {
+      position: absolute; top: 22.5%; left: 10%; width: 80%; height: 18%; 
+      display: flex; align-items: center; justify-content: center; text-align: center; 
+      color: black; font-weight: 700; font-size: clamp(0.9rem, 3.8vw, 1.2rem); line-height: 1.3; padding: 0 10px; z-index: 15;
+    }
+
+    /* Interactive image buttons */
+    .img-btn {
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .img-btn:active {
+      transform: scale(0.95);
+    }
+
+    .toast { position: fixed; top: 30px; left: 50%; transform: translateX(-50%); background: white; color: black; padding: 15px 30px; border-radius: 20px; font-weight: 600; font-size: 1.1rem; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 10000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; width: 90%; max-width: 400px;}
+    .toast.show { opacity: 1; }
+  </style>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const isMobileApp = !!new URLSearchParams(window.location.search).get('uid');
+      const style = document.createElement('style');
+      if (isMobileApp) {
+        document.querySelector('#rotate-overlay p').innerHTML = "Please rotate your phone to portrait mode<br>for the best gaming experience.";
+        style.innerHTML = `
+          @media (orientation: landscape) and (max-height: 600px) { #rotate-overlay { display: flex !important; } }
+          @media (orientation: portrait) { #rotate-overlay { display: none !important; } }
+        `;
+      } else {
+        style.innerHTML = `
+          @media (orientation: portrait) and (max-width: 800px) { #rotate-overlay { display: flex !important; } }
+        `;
+      }
+      document.head.appendChild(style);
+    });
+  </script>
+</head>
+<body>
+  <div id="rotate-overlay">
+    <svg fill="white" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M16.48 2.52c3.27 1.55 5.61 4.72 5.97 8.48h1.5C23.44 4.84 18.29 0 12 0 10.87 0 9.78.16 8.74.45l2.42 2.42c.27-.03.55-.05.84-.05 1.55 0 2.97.58 4.05 1.55l-2.02 2.02h5.5V.95l-3.05 1.57zm-8.96 18.96c-3.27-1.55-5.61-4.72-5.97-8.48h-1.5C.56 19.16 5.71 24 12 24c1.13 0 2.22-.16 3.26-.45l-2.42-2.42c-.27.03-.55.05-.84.05-1.55 0-2.97-.58-4.05-1.55l2.02-2.02h-5.5v5.5l3.05-1.57z"/>
+    </svg>
+    <h2>Rotate Device</h2>
+    <p>Please rotate your phone to landscape mode<br>for the best gaming experience.</p>
+  </div>
+
+  <canvas id="confetti-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9998;display:none;"></canvas>
+  <div class="toast" id="toast"></div>
+
+  <div class="game-container" id="screen-start" style="text-align: center; justify-content: center; z-index: 20;">
+    <button id="btn-exit-start" style="position: absolute; top: 15px; left: 15px; width: auto; padding: 6px 12px; font-size: 0.8rem; z-index: 50; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; cursor: pointer;" onclick="goBack()">← Back to App</button>
+
+    <img src="assets/Myth & Fact/Brought to you by Panadol.png" alt="Brought to you by" style="position: absolute; top: 20px; right: 20px; width: 35%; max-width: 150px; z-index: 50;">
+
+    <img src="assets/Myth & Fact/Myth&Fact_gameLogo.png" alt="Myth vs Fact" style="max-width: 250px; margin: 0 auto 20px; display: block;">
+    
+    <div style="color: white; font-size: clamp(2rem, 8vw, 2.8rem); font-weight: 800; margin-bottom: 10px; padding: 0 20px; box-sizing: border-box;">Myth vs Fact</div>
+
+    <p style="color: #d1d5db; margin-bottom: 30px; line-height: 1.5; font-size: clamp(0.9rem, 4vw, 1.05rem); padding: 0 20px; box-sizing: border-box;">
+      Test your knowledge. Is the statement<br>a Myth or a Fact?<br><br>
+      <!-- [OLD - points system] <strong style="color: white; font-size: clamp(1rem, 4.5vw, 1.15rem); display: block;">Correct answers: +5 pts. Max 40 pts.</strong> -->
+      <strong style="color: white; font-size: clamp(1rem, 4.5vw, 1.15rem); display: block;">Answer all questions correctly to complete the challenge!</strong>
+    </p>
+
+    <img src="assets/Myth & Fact/startgameButton.png" alt="Start Game" class="img-btn" style="width: 80%; max-width: 300px; height: auto; margin: 0 auto; display: block;" onclick="proceedFromStart()">
+  </div>
+
+  <div class="game-container" id="screen-game" style="display: none; padding: 0; width: 100%; height: 100vh;">
+    
+    <img src="assets/Myth & Fact/myth&fact_bg.png" alt="Game Board Background" class="game-board-bg">
+
+    <div class="game-header">
+      <button style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); padding: 8px 20px; width: auto; font-size: 1rem; color: white; border-radius: 8px; cursor: pointer; font-weight: 600;" onclick="goBack()">← Exit</button>
+      <!-- [OLD - points system] <div class="score-display" id="hud-score">0 pts</div> -->
+      <div class="score-display" id="hud-score" style="display:none;">0 pts</div>
+    </div>
+
+    <div class="game-board">
+      <div id="q-progress">Question 1 of 8</div>
+      <div id="q-text">Loading...</div>
+
+    <div style="position: absolute; top: 56%; left: 0; width: 100%; padding: 0 5%; display: flex; justify-content: center; gap: 5%; z-index: 20; box-sizing: border-box;">
+      <img src="assets/Myth & Fact/myth_button.png" alt="Myth" class="img-btn" style="width: 45%; max-width: 180px; height: auto; object-fit: contain;" onclick="answer('myth')">
+      <img src="assets/Myth & Fact/fact_button.png" alt="Fact" class="img-btn" style="width: 45%; max-width: 180px; height: auto; object-fit: contain;" onclick="answer('fact')">
+    </div>
+
+      <img src="assets/Myth & Fact/panadol_logo.png" alt="Panadol Logo" style="position: absolute; bottom: 4%; left: 50%; transform: translateX(-50%); max-width: 100px; z-index: 15;">
+    </div>
+  </div>
+
+  <div class="game-container" id="screen-result" style="display: none; text-align: center; justify-content: center; z-index: 20;">
+    <div style="font-size: 4rem; margin-bottom: 10px;">🏆</div>
+    <div style="color: white; font-size: 2.5rem; font-weight: 800;" id="result-title">Challenge Over</div>
+    <div style="font-weight:800; font-size: 3.5rem; color: #4ade80; margin-bottom: 30px; line-height: 1;" id="result-score">0 pts</div>
+    <div id="result-actions" style="width: 100%;"></div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const uid = urlParams.get('uid');
+    const exhausted = urlParams.get('exhausted') === 'true';
+    const GAME_ID = 'myth';
+    
+    let score = 0; let currentQ = 0;
+
+    const questions = [
+      { 
+        text: "Panadol with Optizorb dissolves 5X faster because it contains innovative Optizorb technology.", 
+        answer: "fact" 
+      },
+      { 
+        text: "Panadol tablets are film-coated with 500 mg fast-absorbed paracetamol.", 
+        answer: "fact" 
+      },
+      { 
+        text: "There is no clear way to differentiate between original Panadol Extra packs and copycat products.", 
+        answer: "myth",
+        explanation: "The original pack can be identified by key features like the Optizorb logo and official branding elements."
+      },
+      { 
+        text: "Only a small percentage of consumers in Egypt consider Panadol when searching for pain relief products.", 
+        answer: "myth",
+        explanation: "Around 99% of consumers consider Panadol, showing very high awareness."
+      },
+      { 
+        text: "84% of consumers in Egypt use Panadol as part of their regular pain relief routine.", 
+        answer: "fact" 
+      },
+      { 
+        text: "Less than half of consumers in Egypt have ever tried Panadol.", 
+        answer: "myth",
+        explanation: "Around 99% of consumers in Egypt have tried Panadol."
+      },
+      { 
+        text: "Panadol Extra contains 500 mg paracetamol combined with 65 mg caffeine and uses Optizorb technology.", 
+        answer: "fact" 
+      },
+      { 
+        text: "Panadol Advance contains 500 mg paracetamol without any absorption-enhancing technology.", 
+        answer: "myth",
+        explanation: "Panadol Advance includes Optizorb technology for faster absorption."
+      }
+    ];
+
+    window.onload = () => { if (!uid) document.getElementById('btn-exit-start').style.display = 'none'; };
+
+    function goBack() { if (uid) window.location.href = 'index.html'; else location.reload(); }
+
+    function proceedFromStart() { document.getElementById('screen-start').style.display = 'none'; startGame(); }
+
+    function startGame() {
+      document.getElementById('screen-game').style.display = 'flex';
+      loadQuestion();
+    }
+
+    function loadQuestion() {
+      if (currentQ >= questions.length) { finishGame(); return; }
+      document.getElementById('q-progress').textContent = `Question ${currentQ + 1} of ${questions.length}`;
+      document.getElementById('q-text').textContent = questions[currentQ].text;
+    }
+
+    function answer(choice) {
+      const q = questions[currentQ];
+      const isCorrect = (choice === q.answer);
+      
+      // [OLD - points system] let msg = isCorrect ? "Correct! +5 pts" : "Incorrect!";
+      let msg = isCorrect ? "Correct!" : "Incorrect!";
+      
+      if (q.explanation) {
+         msg += `<br><span style='font-size:0.85rem; font-weight:400; display:block; margin-top:6px; line-height:1.3;'>${q.explanation}</span>`;
+      }
+
+      if (isCorrect) { 
+        score += 5; 
+        // [OLD - points system] document.getElementById('hud-score').textContent = score + " pts";
+      }
+      
+      const readTime = q.explanation ? 3500 : 1500;
+      showToast(msg, readTime); 
+      
+      currentQ++; 
+      
+      setTimeout(loadQuestion, readTime);
+    }
+
+    function finishGame() {
+      document.getElementById('screen-game').style.display = 'none'; 
+      document.getElementById('screen-result').style.display = 'flex';
+      // [OLD - points system] document.getElementById('result-score').textContent = score + " pts";
+      document.getElementById('result-score').textContent = "Challenge Complete!";
+      
+      if (score > 0) launchConfetti(3000); 
+
+      const actionsDiv = document.getElementById('result-actions');
+      const collectBtnHTML = `<img src="assets/Myth & Fact/Collect Points & Complete_button.png" alt="Collect Points" class="img-btn" style="width: 80%; max-width: 320px; display: block; margin: 0 auto;" onclick="processPoints()">`;
+
+      actionsDiv.innerHTML = collectBtnHTML;
+    }
+
+    function processPoints() {
+      const actionsDiv = document.getElementById('result-actions'); actionsDiv.innerHTML = "<p style='font-size: 1.2rem; font-weight: 600; color: white;'>Processing...</p>";
+
+      if (uid) { window.location.href = `index.html?rewardGame=${GAME_ID}&rewardPts=5`; } else {
+        const payload = JSON.stringify({ type: "game_reward", gameId: GAME_ID, points: 5, nonce: Date.now() });
+        const qr = qrcode(0, 'L'); qr.addData(payload); qr.make();
+        
+        actionsDiv.innerHTML = `
+          <div style="background:white; padding:15px; border-radius:16px; display:inline-block; margin-bottom:15px; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+            ${qr.createImgTag(5)}
+          </div>
+          <p style="color:#d1d5db; font-size:1rem; margin-bottom: 25px; font-weight: 500;">Scan this QR with your App to collect points.</p>
+          <img src="assets/Myth & Fact/stratNemGame_button.png" alt="Start New Game" class="img-btn" style="width: 70%; max-width: 280px; display: block; margin: 0 auto;" onclick="location.reload()">
+        `;
+      }
+    }
+
+    let toastTimeout;
+    function showToast(msg, duration = 1500) { 
+        const toast = document.getElementById("toast"); 
+        toast.innerHTML = msg; 
+        toast.classList.add("show"); 
+        
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => toast.classList.remove("show"), duration); 
+    }
+    
+    function launchConfetti(duration) { const canvas = document.getElementById("confetti-canvas"); if(!canvas) return; const ctx = canvas.getContext("2d"); canvas.style.display = "block"; canvas.width = window.innerWidth; canvas.height = window.innerHeight; const pieces = []; const colors = ["#002A6C", "#0055A5", "#FFFFFF", "#38BDF8", "#E11D48"]; for (let i = 0; i < 150; i++) pieces.push({ x: Math.random() * canvas.width, y: -10 - Math.random() * 200, r: 6 + Math.random() * 8, color: colors[Math.floor(Math.random() * colors.length)], vx: (Math.random() - 0.5) * 5, vy: 3 + Math.random() * 5, rot: Math.random() * 360, rs: (Math.random() - 0.5) * 8 }); const end = Date.now() + duration; (function frame() { ctx.clearRect(0, 0, canvas.width, canvas.height); pieces.forEach((p) => { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.rot * Math.PI) / 180); ctx.fillStyle = p.color; ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.6); ctx.restore(); p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.rot += p.rs; }); if (Date.now() < end) requestAnimationFrame(frame); else { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = "none"; } })(); }
+  </script>
+<div style="position: fixed; bottom: 5px; left: 0; width: 100%; text-align: center; color: rgba(255,255,255,0.3); font-size: 12px; pointer-events: none; z-index: 9999;">PM-EG-CNT-26-00007</div>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register - Haleon Partners Club</title>
+  
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // 1. Initialize Firebase
+    const firebaseConfig = {
+      apiKey:            "AIzaSyAmVVQEPpfs_K3AfqfjkAaQUF8foj-WxsU",
+      authDomain:        "haleon-partners-club.firebaseapp.com",
+      projectId:         "haleon-partners-club",
+      storageBucket:     "haleon-partners-club.firebasestorage.app",
+      messagingSenderId: "1037867331058",
+      appId:             "1:1037867331058:web:0777855bac1c681ad88f6b"
+    };
+
+    const fbApp = initializeApp(firebaseConfig);
+    const auth  = getAuth(fbApp);
+    const db    = getFirestore(fbApp);
+
+    // Parse URL parameters and check for reference
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('ref') === 'in_event') {
+      sessionStorage.setItem('ref', 'in_event');
+      localStorage.setItem('ref', 'in_event');
+    }
+
+    const SHEETS_WEBHOOK = "https://script.google.com/macros/s/AKfycbwHj5I-AiO5mQhxJCUHjFf-p1spOTU-E5LZH3-Lc4cq5zkTHs2U-RrTsSY8JFzl2KrX/exec";
+
+    // 2. Map Firebase error codes to friendly messages
+    function friendlyError(code) { 
+      const map = { 
+        "auth/email-already-in-use": "This email is already registered.", 
+        "auth/invalid-email": "Please enter a valid email address.", 
+        "auth/weak-password": "Password must be at least 6 characters."
+      }; 
+      return map[code] || "Something went wrong. Please try again."; 
+    }
+
+    // 3. Main Registration Function
+    window.doRegisterStandalone = async function() {
+      const fname = document.getElementById("reg-fname").value.trim(); 
+      const lname = document.getElementById("reg-lname").value.trim(); 
+      const email = document.getElementById("reg-email").value.trim(); 
+      const phone = document.getElementById("reg-phone").value.trim(); 
+      const pharmacy = document.getElementById("reg-pharmacy").value.trim(); 
+      const city = document.getElementById("reg-city").value.trim(); 
+      const profession = document.getElementById("reg-profession").value;
+      const rawPassword = document.getElementById("reg-pass").value.trim(); 
+      let pass = rawPassword;
+
+      const errEl = document.getElementById("reg-error"); 
+      const btn = document.getElementById("btn-register");
+      
+      errEl.textContent = ""; 
+      
+      if (!fname || !lname || !email || !phone || !pharmacy || !city || !profession || !pass) { 
+        errEl.textContent = "Please fill in all fields."; 
+        return; 
+      }
+
+      while (pass.length > 0 && pass.length < 6) pass += "0";
+
+      if (pass.length < 6) { 
+        errEl.textContent = "Password must be at least 6 characters."; 
+        return; 
+      }
+      
+      btn.textContent = "Creating account…"; 
+      btn.disabled = true;
+
+      try {
+        // Create user in Firebase Auth
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        const uid = cred.user.uid; 
+        const memberId = uid.slice(0, 8).toUpperCase();
+        
+        // Establish Tier Mapping
+        const t = profession.toLowerCase();
+        let computedTier = "Student";
+        if (t === "pharmacy owner") computedTier = "Pharmacy Owner";
+        else if (t === "community pharmacist" || t === "pharmacist") computedTier = "Community Pharmacist";
+
+        const name = fname + " " + lname;
+
+        // Prepare Firestore Data
+        const profile = { 
+            firstName: fname, 
+            lastName: lname, 
+            name, 
+            email, 
+            phone, 
+            pharmacy, 
+            city, 
+            profession, 
+            pin: rawPassword,
+            memberId 
+        };
+        const userData = { 
+          profile, 
+          score: 15, 
+          initialOnboardingClaimed: true,
+          quizzesCompleted: 0, 
+          claimedBadges: [], 
+          answeredQuestions: [], 
+          gamesCompleted: {}, 
+          tier: computedTier, 
+          active: false,
+          attendance: false,
+          cardId: "",
+          createdAt: new Date().toISOString() 
+        };
+        
+        // Save to Firestore
+        await setDoc(doc(db, "users", uid), userData);
+        
+        // Sync to Google Sheets
+        const payload = { 
+          uid, name, email, phone, pharmacy, memberId, 
+          score: 15, quizzesCompleted: 0, tier: computedTier, 
+          badges: "", badgesCount: 0, 
+          lastUpdated: new Date().toISOString(),
+          pin: rawPassword
+        };
+        fetch(SHEETS_WEBHOOK, { 
+          method: "POST", mode: "no-cors", 
+          headers: { "Content-Type": "application/json" }, 
+          body: JSON.stringify(payload) 
+        }).catch(() => {});
+
+        // Redirect to index.html with a special flag to trigger the welcome screen
+        window.location.href = "index.html?registered=true";
+
+      } catch (e) { 
+        errEl.textContent = friendlyError(e.code); 
+        btn.textContent = "CREATE ACCOUNT"; 
+        btn.disabled = false; 
+      } 
+    };
+  </script>
+</head>
+<body style="background: var(--bg);">
+  <div class="app">
+    <div class="view auth-view active" id="view-register">
+      <div class="auth-logo">
+        <img src="assets/logo1.png" alt="Haleon Logo" class="app-logo" style="max-width: 200px;">
+      </div>
+      <div class="auth-title">Create account.</div>
+      <style>
+        .field select { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid var(--border, #333); background: var(--surface2, #111418); color: white; font-size: 1rem; font-family: inherit; outline: none; -webkit-appearance: none; appearance: none; }
+        .field select:focus { border-color: var(--green, #2ee701); }
+      </style>
+      <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div class="field" style="margin-bottom: 0; flex: 1;"><input type="text" id="reg-fname" placeholder="First name" /></div>
+        <div class="field" style="margin-bottom: 0; flex: 1;"><input type="text" id="reg-lname" placeholder="Last name" /></div>
+      </div>
+      <div class="field"><input type="email"    id="reg-email"    placeholder="Email address" /></div>
+      <div class="field"><input type="tel"      id="reg-phone"    placeholder="Phone number" /></div>
+      <div class="field"><input type="text"     id="reg-pharmacy" placeholder="Pharmacy name" /></div>
+      <div class="field"><input type="text"     id="reg-city"     placeholder="City" /></div>
+      <div class="field">
+        <select id="reg-profession">
+          <option value="" disabled selected>Select Profession / Tier</option>
+          <option value="Student">Student</option>
+          <option value="Community Pharmacist">Community Pharmacist</option>
+          <option value="Pharmacy Owner">Pharmacy Owner</option>
+        </select>
+      </div>
+      <div class="field"><input type="password" id="reg-pass"     placeholder="4-Digit PIN (or Password)" /></div>
+      <div class="auth-error" id="reg-error"></div>
+      
+      <button class="btn-primary" id="btn-register" onclick="doRegisterStandalone()">CREATE ACCOUNT</button>
+      
+      <div class="auth-switch">Have an account? <a href="index.html">Login</a></div>
+      
+      <img src="assets/Brought To You By.png" alt="Brought to you by Haleon" style="max-width: 180px; margin: 40px auto 0; display: block;">
+    </div>
+  </div>
+<div style="position: fixed; bottom: 5px; left: 0; width: 100%; text-align: center; color: grey; font-size: 12px; pointer-events: none; z-index: 9999;">PM-EG-CNT-26-00007</div>
+</body>
+</html>
